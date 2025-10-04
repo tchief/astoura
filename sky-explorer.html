@@ -1,0 +1,735 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Sky Explorer - Multiplayer Star Mapping</title>
+    <link rel="stylesheet" href="https://aladin.cds.unistra.fr/AladinLite/api/v3/latest/aladin.min.css" />
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        html, body {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
+            background: #000;
+        }
+        
+        #aladin-lite-div {
+            width: 100%;
+            height: 100%;
+        }
+        
+        #controls {
+            position: fixed;
+            top: 10px;
+            left: 10px;
+            background: rgba(0, 0, 0, 0.8);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 8px;
+            padding: 15px;
+            color: white;
+            max-width: 320px;
+            backdrop-filter: blur(10px);
+            z-index: 1000;
+            transition: transform 0.3s ease;
+        }
+        
+        #controls.collapsed {
+            transform: translateX(-280px);
+        }
+        
+        #toggle-controls {
+            position: absolute;
+            right: -30px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: rgba(0, 0, 0, 0.8);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 0 4px 4px 0;
+            padding: 10px 5px;
+            cursor: pointer;
+            color: white;
+        }
+        
+        .control-group {
+            margin-bottom: 15px;
+        }
+        
+        .control-group:last-child {
+            margin-bottom: 0;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-size: 12px;
+            color: rgba(255, 255, 255, 0.8);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        input[type="text"],
+        input[type="color"],
+        select {
+            width: 100%;
+            padding: 8px;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            border-radius: 4px;
+            color: white;
+            font-size: 14px;
+        }
+        
+        input[type="color"] {
+            height: 36px;
+            cursor: pointer;
+        }
+        
+        button {
+            width: 100%;
+            padding: 10px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border: none;
+            border-radius: 4px;
+            color: white;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s ease, opacity 0.2s ease;
+        }
+        
+        button:hover {
+            transform: translateY(-1px);
+            opacity: 0.9;
+        }
+        
+        button:active {
+            transform: translateY(0);
+        }
+        
+        #mode-selector {
+            display: flex;
+            gap: 5px;
+            margin-bottom: 10px;
+        }
+        
+        .mode-btn {
+            flex: 1;
+            padding: 8px;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            border-radius: 4px;
+            color: white;
+            cursor: pointer;
+            font-size: 12px;
+            transition: all 0.2s ease;
+        }
+        
+        .mode-btn.active {
+            background: rgba(102, 126, 234, 0.5);
+            border-color: #667eea;
+        }
+        
+        #status {
+            position: fixed;
+            bottom: 10px;
+            left: 10px;
+            background: rgba(0, 0, 0, 0.8);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 4px;
+            padding: 8px 12px;
+            color: white;
+            font-size: 12px;
+            backdrop-filter: blur(10px);
+            z-index: 1000;
+        }
+        
+        #marker-list {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            background: rgba(0, 0, 0, 0.8);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 8px;
+            padding: 15px;
+            color: white;
+            max-width: 280px;
+            max-height: 400px;
+            overflow-y: auto;
+            backdrop-filter: blur(10px);
+            z-index: 1000;
+        }
+        
+        .marker-item {
+            padding: 8px;
+            margin-bottom: 8px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 4px;
+            border-left: 3px solid;
+            font-size: 12px;
+        }
+        
+        .marker-author {
+            font-weight: 600;
+            margin-bottom: 2px;
+        }
+        
+        .marker-coords {
+            color: rgba(255, 255, 255, 0.6);
+            font-family: monospace;
+            font-size: 11px;
+        }
+        
+        .marker-text {
+            margin-top: 4px;
+            color: rgba(255, 255, 255, 0.9);
+        }
+        
+        @media (max-width: 640px) {
+            #controls {
+                max-width: 250px;
+                padding: 10px;
+            }
+            
+            #marker-list {
+                display: none;
+            }
+        }
+        
+        #fullscreen-btn {
+            position: fixed;
+            bottom: 10px;
+            right: 10px;
+            width: 40px;
+            height: 40px;
+            background: rgba(0, 0, 0, 0.8);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 4px;
+            color: white;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+    </style>
+</head>
+<body>
+    <div id="aladin-lite-div"></div>
+    
+    <div id="controls">
+        <div id="toggle-controls">☰</div>
+        <h3 style="margin-bottom: 15px; font-size: 16px;">Sky Explorer</h3>
+        
+        <div id="mode-selector">
+            <button class="mode-btn active" data-mode="marker">Marker</button>
+            <button class="mode-btn" data-mode="polyline">Path</button>
+            <button class="mode-btn" data-mode="explore">Explore</button>
+        </div>
+        
+        <div class="control-group">
+            <label for="username">Your Name</label>
+            <input type="text" id="username" placeholder="Anonymous Explorer" maxlength="20">
+        </div>
+        
+        <div class="control-group">
+            <label for="marker-color">Marker Color</label>
+            <input type="color" id="marker-color" value="#667eea">
+        </div>
+        
+        <div class="control-group">
+            <label for="marker-shape">Marker Shape</label>
+            <select id="marker-shape">
+                <option value="circle">Circle</option>
+                <option value="square">Square</option>
+                <option value="plus">Plus</option>
+                <option value="cross">Cross</option>
+                <option value="diamond">Diamond</option>
+                <option value="triangle">Triangle</option>
+            </select>
+        </div>
+        
+        <div class="control-group">
+            <label for="marker-text">Description (optional)</label>
+            <input type="text" id="marker-text" placeholder="What did you find?">
+        </div>
+        
+        <div class="control-group">
+            <button id="clear-my-markers">Clear My Markers</button>
+        </div>
+    </div>
+    
+    <div id="status">
+        <span id="status-text">Click on the sky to place markers</span> | 
+        <span id="connection-status">🟢 Connected</span>
+    </div>
+    
+    <div id="marker-list">
+        <h4 style="margin-bottom: 10px; font-size: 14px;">Recent Discoveries</h4>
+        <div id="marker-items"></div>
+    </div>
+    
+    <button id="fullscreen-btn">⛶</button>
+    
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script type="module">
+        import A from 'https://aladin.cds.unistra.fr/AladinLite/api/v3/latest/aladin.js';
+        
+        class SkyExplorer {
+            constructor() {
+                this.aladin = null;
+                this.mode = 'marker';
+                this.username = localStorage.getItem('username') || 'Anonymous';
+                this.userId = this.generateUserId();
+                this.markers = new Map();
+                this.polylines = [];
+                this.currentPolyline = [];
+                this.catalogs = new Map();
+                this.broadcastChannel = new BroadcastChannel('sky-explorer');
+                this.init();
+            }
+            
+            generateUserId() {
+                let id = localStorage.getItem('userId');
+                if (!id) {
+                    id = 'user_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+                    localStorage.setItem('userId', id);
+                }
+                return id;
+            }
+            
+            async init() {
+                this.aladin = await A.init('#aladin-lite-div', {
+                    survey: 'P/DSS2/color',
+                    fov: 10,
+                    showReticle: true,
+                    showZoomControl: true,
+                    showFullscreenControl: false,
+                    showLayersControl: true,
+                    showGotoControl: true,
+                    showShareControl: false,
+                    showCatalog: true,
+                    showFrame: true,
+                    showCooGrid: true,
+                    projection: 'SIN',
+                    cooFrame: 'J2000'
+                });
+                
+                this.setupEventListeners();
+                this.loadStoredMarkers();
+                this.setupBroadcast();
+                this.updateUsername();
+            }
+            
+            setupEventListeners() {
+                this.aladin.on('click', (object) => {
+                    if (this.mode === 'marker') {
+                        this.addMarker(object);
+                    } else if (this.mode === 'polyline') {
+                        this.addPolylinePoint(object);
+                    }
+                });
+                
+                this.aladin.on('select', (sources) => {
+                    if (sources && sources.length > 0) {
+                        const source = sources[0];
+                        if (source.data && source.data.description) {
+                            this.showMarkerInfo(source.data);
+                        }
+                    }
+                });
+                
+                document.querySelectorAll('.mode-btn').forEach(btn => {
+                    btn.addEventListener('click', (e) => {
+                        document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
+                        e.target.classList.add('active');
+                        this.mode = e.target.dataset.mode;
+                        this.updateStatus();
+                        
+                        if (this.mode === 'polyline' && this.currentPolyline.length > 1) {
+                            this.finishPolyline();
+                        }
+                    });
+                });
+                
+                document.getElementById('username').addEventListener('change', (e) => {
+                    this.username = e.target.value || 'Anonymous';
+                    localStorage.setItem('username', this.username);
+                });
+                
+                document.getElementById('clear-my-markers').addEventListener('click', () => {
+                    this.clearMyMarkers();
+                });
+                
+                document.getElementById('toggle-controls').addEventListener('click', () => {
+                    document.getElementById('controls').classList.toggle('collapsed');
+                });
+                
+                document.getElementById('fullscreen-btn').addEventListener('click', () => {
+                    if (!document.fullscreenElement) {
+                        document.documentElement.requestFullscreen();
+                    } else {
+                        document.exitFullscreen();
+                    }
+                });
+                
+                document.addEventListener('keydown', (e) => {
+                    if (e.key === 'Escape' && this.mode === 'polyline' && this.currentPolyline.length > 0) {
+                        this.finishPolyline();
+                    }
+                });
+            }
+            
+            updateUsername() {
+                document.getElementById('username').value = this.username;
+            }
+            
+            updateStatus() {
+                const statusText = document.getElementById('status-text');
+                switch(this.mode) {
+                    case 'marker':
+                        statusText.textContent = 'Click on the sky to place markers';
+                        break;
+                    case 'polyline':
+                        statusText.textContent = this.currentPolyline.length > 0 ? 
+                            'Click to add points, ESC to finish' : 'Click to start drawing a path';
+                        break;
+                    case 'explore':
+                        statusText.textContent = 'Explore mode - Pan and zoom freely';
+                        break;
+                }
+            }
+            
+            addMarker(clickData) {
+                if (!clickData || !clickData.ra || !clickData.dec) return;
+                
+                const color = document.getElementById('marker-color').value;
+                const shape = document.getElementById('marker-shape').value;
+                const text = document.getElementById('marker-text').value;
+                
+                const markerData = {
+                    id: Date.now() + '_' + Math.random(),
+                    ra: clickData.ra,
+                    dec: clickData.dec,
+                    author: this.username,
+                    userId: this.userId,
+                    color: color,
+                    shape: shape,
+                    text: text,
+                    timestamp: Date.now()
+                };
+                
+                this.createMarkerCatalog(markerData);
+                this.saveMarker(markerData);
+                this.broadcastMarker(markerData);
+                this.addToMarkerList(markerData);
+                
+                document.getElementById('marker-text').value = '';
+            }
+            
+            createMarkerCatalog(markerData) {
+                const catalogKey = `${markerData.userId}_${markerData.color}_${markerData.shape}`;
+                
+                if (!this.catalogs.has(catalogKey)) {
+                    const catalog = this.aladin.createCatalog({
+                        name: `${markerData.author}'s markers`,
+                        sourceSize: 14,
+                        color: markerData.color,
+                        shape: markerData.shape
+                    });
+                    this.aladin.addCatalog(catalog);
+                    this.catalogs.set(catalogKey, catalog);
+                }
+                
+                const catalog = this.catalogs.get(catalogKey);
+                const source = {
+                    ra: markerData.ra,
+                    dec: markerData.dec,
+                    name: markerData.text || `${markerData.author}'s discovery`,
+                    description: markerData
+                };
+                catalog.addSources([source]);
+                
+                this.markers.set(markerData.id, {data: markerData, catalog: catalog, source: source});
+            }
+            
+            addPolylinePoint(clickData) {
+                if (!clickData || !clickData.ra || !clickData.dec) return;
+                
+                this.currentPolyline.push([clickData.ra, clickData.dec]);
+                
+                if (this.currentPolyline.length === 1) {
+                    const catalog = this.aladin.createCatalog({
+                        name: 'Path start',
+                        sourceSize: 8,
+                        color: document.getElementById('marker-color').value,
+                        shape: 'circle'
+                    });
+                    catalog.addSources([{ra: clickData.ra, dec: clickData.dec}]);
+                    this.aladin.addCatalog(catalog);
+                }
+                
+                if (this.currentPolyline.length >= 2) {
+                    this.drawPolyline();
+                }
+                
+                this.updateStatus();
+            }
+            
+            drawPolyline() {
+                // V3 API doesn't have the same overlay system, using markers for now
+                const color = document.getElementById('marker-color').value;
+                for (let i = 1; i < this.currentPolyline.length; i++) {
+                    const catalog = this.aladin.createCatalog({
+                        name: `Path segment ${i}`,
+                        sourceSize: 4,
+                        color: color,
+                        shape: 'circle'
+                    });
+                    
+                    // Add intermediate points
+                    const prev = this.currentPolyline[i - 1];
+                    const curr = this.currentPolyline[i];
+                    const steps = 10;
+                    for (let j = 0; j <= steps; j++) {
+                        const ra = prev[0] + (curr[0] - prev[0]) * j / steps;
+                        const dec = prev[1] + (curr[1] - prev[1]) * j / steps;
+                        catalog.addSources([{ra: ra, dec: dec}]);
+                    }
+                    this.aladin.addCatalog(catalog);
+                }
+            }
+            
+            finishPolyline() {
+                if (this.currentPolyline.length > 1) {
+                    const polylineData = {
+                        id: Date.now() + '_polyline',
+                        points: this.currentPolyline,
+                        author: this.username,
+                        userId: this.userId,
+                        color: document.getElementById('marker-color').value,
+                        timestamp: Date.now()
+                    };
+                    
+                    this.polylines.push(polylineData);
+                    this.savePolyline(polylineData);
+                    this.broadcastPolyline(polylineData);
+                }
+                
+                this.currentPolyline = [];
+                this.updateStatus();
+            }
+            
+            saveMarker(markerData) {
+                const stored = JSON.parse(localStorage.getItem('skyMarkers') || '[]');
+                stored.push(markerData);
+                if (stored.length > 1000) {
+                    stored.shift();
+                }
+                localStorage.setItem('skyMarkers', JSON.stringify(stored));
+            }
+            
+            savePolyline(polylineData) {
+                const stored = JSON.parse(localStorage.getItem('skyPolylines') || '[]');
+                stored.push(polylineData);
+                if (stored.length > 100) {
+                    stored.shift();
+                }
+                localStorage.setItem('skyPolylines', JSON.stringify(stored));
+            }
+            
+            loadStoredMarkers() {
+                const markers = JSON.parse(localStorage.getItem('skyMarkers') || '[]');
+                const polylines = JSON.parse(localStorage.getItem('skyPolylines') || '[]');
+                
+                markers.forEach(marker => {
+                    this.createMarkerCatalog(marker);
+                    this.addToMarkerList(marker);
+                });
+                
+                polylines.forEach(polyline => {
+                    this.recreatePolyline(polyline);
+                });
+            }
+            
+            recreatePolyline(polylineData) {
+                // V3 API doesn't have the same overlay system, using markers for now
+                for (let i = 1; i < polylineData.points.length; i++) {
+                    const catalog = this.aladin.createCatalog({
+                        name: `${polylineData.author}'s path ${i}`,
+                        sourceSize: 4,
+                        color: polylineData.color,
+                        shape: 'circle'
+                    });
+                    
+                    const prev = polylineData.points[i - 1];
+                    const curr = polylineData.points[i];
+                    const steps = 10;
+                    for (let j = 0; j <= steps; j++) {
+                        const ra = prev[0] + (curr[0] - prev[0]) * j / steps;
+                        const dec = prev[1] + (curr[1] - prev[1]) * j / steps;
+                        catalog.addSources([{ra: ra, dec: dec}]);
+                    }
+                    this.aladin.addCatalog(catalog);
+                }
+            }
+            
+            clearMyMarkers() {
+                const myMarkers = Array.from(this.markers.values())
+                    .filter(m => m.data.userId === this.userId);
+                
+                myMarkers.forEach(marker => {
+                    if (marker.catalog && marker.source) {
+                        marker.catalog.remove(marker.source);
+                    }
+                    this.markers.delete(marker.data.id);
+                });
+                
+                const allMarkers = JSON.parse(localStorage.getItem('skyMarkers') || '[]');
+                const filtered = allMarkers.filter(m => m.userId !== this.userId);
+                localStorage.setItem('skyMarkers', JSON.stringify(filtered));
+                
+                this.updateMarkerList();
+                this.broadcastClear();
+            }
+            
+            setupBroadcast() {
+                this.broadcastChannel.onmessage = (event) => {
+                    const { type, data } = event.data;
+                    
+                    switch(type) {
+                        case 'marker':
+                            if (data.userId !== this.userId) {
+                                this.createMarkerCatalog(data);
+                                this.addToMarkerList(data);
+                            }
+                            break;
+                        case 'polyline':
+                            if (data.userId !== this.userId) {
+                                this.recreatePolyline(data);
+                            }
+                            break;
+                        case 'clear':
+                            if (data.userId !== this.userId) {
+                                this.removeUserMarkers(data.userId);
+                            }
+                            break;
+                        case 'request':
+                            this.broadcastAllMarkers();
+                            break;
+                    }
+                };
+                
+                setTimeout(() => {
+                    this.broadcastChannel.postMessage({ type: 'request', data: { userId: this.userId }});
+                }, 100);
+            }
+            
+            broadcastMarker(markerData) {
+                this.broadcastChannel.postMessage({ type: 'marker', data: markerData });
+            }
+            
+            broadcastPolyline(polylineData) {
+                this.broadcastChannel.postMessage({ type: 'polyline', data: polylineData });
+            }
+            
+            broadcastClear() {
+                this.broadcastChannel.postMessage({ type: 'clear', data: { userId: this.userId }});
+            }
+            
+            broadcastAllMarkers() {
+                const markers = JSON.parse(localStorage.getItem('skyMarkers') || '[]');
+                markers.forEach(marker => {
+                    this.broadcastChannel.postMessage({ type: 'marker', data: marker });
+                });
+                
+                const polylines = JSON.parse(localStorage.getItem('skyPolylines') || '[]');
+                polylines.forEach(polyline => {
+                    this.broadcastChannel.postMessage({ type: 'polyline', data: polyline });
+                });
+            }
+            
+            removeUserMarkers(userId) {
+                const userMarkers = Array.from(this.markers.values())
+                    .filter(m => m.data.userId === userId);
+                
+                userMarkers.forEach(marker => {
+                    if (marker.catalog && marker.source) {
+                        marker.catalog.remove(marker.source);
+                    }
+                    this.markers.delete(marker.data.id);
+                });
+                
+                this.updateMarkerList();
+            }
+            
+            addToMarkerList(markerData) {
+                const list = document.getElementById('marker-items');
+                const existing = document.getElementById(`marker-${markerData.id}`);
+                if (existing) return;
+                
+                const item = document.createElement('div');
+                item.id = `marker-${markerData.id}`;
+                item.className = 'marker-item';
+                item.style.borderLeftColor = markerData.color;
+                
+                const raFormatted = (markerData.ra / 15).toFixed(4);
+                const decFormatted = markerData.dec.toFixed(4);
+                
+                item.innerHTML = `
+                    <div class="marker-author">${markerData.author}</div>
+                    <div class="marker-coords">RA: ${raFormatted}h, Dec: ${decFormatted}°</div>
+                    ${markerData.text ? `<div class="marker-text">${markerData.text}</div>` : ''}
+                `;
+                
+                item.addEventListener('click', () => {
+                    this.aladin.gotoRaDec(markerData.ra, markerData.dec);
+                });
+                
+                list.insertBefore(item, list.firstChild);
+                
+                while (list.children.length > 20) {
+                    list.removeChild(list.lastChild);
+                }
+            }
+            
+            updateMarkerList() {
+                const list = document.getElementById('marker-items');
+                const markers = Array.from(this.markers.values())
+                    .sort((a, b) => b.data.timestamp - a.data.timestamp)
+                    .slice(0, 20);
+                
+                list.innerHTML = '';
+                markers.forEach(marker => {
+                    this.addToMarkerList(marker.data);
+                });
+            }
+            
+            showMarkerInfo(markerData) {
+                const raFormatted = (markerData.ra / 15).toFixed(4);
+                const decFormatted = markerData.dec.toFixed(4);
+                const date = new Date(markerData.timestamp).toLocaleString();
+                
+                const info = `
+                    <strong>${markerData.author}</strong><br>
+                    RA: ${raFormatted}h, Dec: ${decFormatted}°<br>
+                    ${markerData.text ? markerData.text + '<br>' : ''}
+                    <small>${date}</small>
+                `;
+                
+                document.getElementById('status-text').innerHTML = info;
+            }
+        }
+        
+        let explorer;
+        $(document).ready(async function() {
+            explorer = new SkyExplorer();
+        });
+    </script>
+</body>
+</html>

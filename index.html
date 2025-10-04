@@ -1,0 +1,712 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Космічна Карта - Мультиплеєр</title>
+    <link rel="stylesheet" href="https://aladin.cds.unistra.fr/AladinLite/api/v3/latest/aladin.min.css" crossorigin="anonymous" />
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+            overflow: hidden;
+            background: #000;
+        }
+
+        #aladin-lite-div {
+            width: 100vw;
+            height: 100vh;
+        }
+
+        #controls {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            z-index: 1000;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 15px;
+            border-radius: 10px;
+            color: white;
+            backdrop-filter: blur(10px);
+            max-width: 320px;
+            transition: transform 0.3s ease;
+        }
+
+        #controls.collapsed {
+            transform: translateX(-290px);
+        }
+
+        #toggle-controls {
+            position: absolute;
+            right: -40px;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 40px;
+            height: 60px;
+            background: rgba(0, 0, 0, 0.8);
+            border: none;
+            color: white;
+            cursor: pointer;
+            border-radius: 0 10px 10px 0;
+            font-size: 18px;
+            backdrop-filter: blur(10px);
+        }
+
+        h1 {
+            font-size: 1.2em;
+            margin-bottom: 15px;
+            color: #fff;
+        }
+
+        .control-group {
+            margin-bottom: 15px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-size: 0.9em;
+            color: #aaa;
+        }
+
+        input[type="text"], textarea, select {
+            width: 100%;
+            padding: 8px;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 5px;
+            color: white;
+            font-size: 14px;
+        }
+
+        input[type="text"]:focus, textarea:focus, select:focus {
+            outline: none;
+            border-color: #4a9eff;
+            background: rgba(255, 255, 255, 0.15);
+        }
+
+        input[type="color"] {
+            width: 50px;
+            height: 35px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+
+        button {
+            padding: 10px 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border: none;
+            border-radius: 5px;
+            color: white;
+            cursor: pointer;
+            font-size: 14px;
+            transition: transform 0.2s;
+            width: 100%;
+        }
+
+        button:hover {
+            transform: scale(1.05);
+        }
+
+        button:active {
+            transform: scale(0.95);
+        }
+
+        #marker-type {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+
+        .type-btn {
+            flex: 1;
+            padding: 8px;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 5px;
+            color: white;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .type-btn.active {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-color: transparent;
+        }
+
+        #status {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 10px 15px;
+            border-radius: 5px;
+            color: white;
+            font-size: 12px;
+            backdrop-filter: blur(10px);
+        }
+
+        #user-list {
+            margin-top: 15px;
+            padding-top: 15px;
+            border-top: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .user-item {
+            display: flex;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+
+        .user-color {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            margin-right: 10px;
+        }
+
+        .user-name {
+            font-size: 14px;
+        }
+
+        @media (max-width: 640px) {
+            #controls {
+                top: 10px;
+                left: 10px;
+                padding: 10px;
+                max-width: 280px;
+            }
+            
+            h1 {
+                font-size: 1em;
+            }
+            
+            button {
+                padding: 8px 15px;
+            }
+        }
+
+        #coordinates {
+            font-size: 12px;
+            color: #888;
+            margin-top: 10px;
+            padding-top: 10px;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .marker-popup {
+            background: rgba(0, 0, 0, 0.9);
+            padding: 10px;
+            border-radius: 5px;
+            color: white;
+            font-size: 14px;
+        }
+
+        .marker-popup .author {
+            color: #4a9eff;
+            font-weight: bold;
+        }
+
+        .marker-popup .text {
+            margin-top: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div id="aladin-lite-div"></div>
+    
+    <div id="controls">
+        <button id="toggle-controls">☰</button>
+        <h1>🌌 Космічна Карта</h1>
+        
+        <div class="control-group">
+            <label>Ваше ім'я:</label>
+            <input type="text" id="username" placeholder="Введіть ім'я" maxlength="20">
+        </div>
+
+        <div class="control-group">
+            <label>Ваш колір:</label>
+            <input type="color" id="userColor" value="#4a9eff">
+        </div>
+
+        <div class="control-group">
+            <label>Тип мітки:</label>
+            <div id="marker-type">
+                <button class="type-btn active" data-type="star">⭐ Зірка</button>
+                <button class="type-btn" data-type="galaxy">🌀 Галактика</button>
+                <button class="type-btn" data-type="planet">🪐 Планета</button>
+            </div>
+        </div>
+
+        <div class="control-group">
+            <label>Опис (опціонально):</label>
+            <textarea id="markerText" rows="2" placeholder="Додайте опис..."></textarea>
+        </div>
+
+        <div class="control-group">
+            <button id="addMarker">📍 Додати мітку</button>
+        </div>
+
+        <div class="control-group">
+            <button id="clearMyMarkers">🗑️ Очистити мої мітки</button>
+        </div>
+
+        <div id="coordinates">
+            <div>RA: <span id="ra">-</span></div>
+            <div>Dec: <span id="dec">-</span></div>
+        </div>
+
+        <div id="user-list">
+            <label>Активні користувачі:</label>
+            <div id="users"></div>
+        </div>
+    </div>
+
+    <div id="status">
+        <span id="connection-status">🟢 Підключено</span> | 
+        <span id="marker-count">0 міток</span>
+    </div>
+
+    <!-- jQuery -->
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js" crossorigin="anonymous"></script>
+    
+    <!-- Aladin Lite with WASM support -->
+    <script type="text/javascript" src="https://aladin.cds.unistra.fr/AladinLite/api/v3/latest/aladin.js" charset="utf-8" crossorigin="anonymous"></script>
+    
+    <script type="text/javascript">
+        // Generate unique user ID
+        const userId = 'user_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+        let username = localStorage.getItem('username') || '';
+        let userColor = localStorage.getItem('userColor') || '#4a9eff';
+        let markerType = 'star';
+        let aladin;
+        let markersData = JSON.parse(localStorage.getItem('markersData')) || [];
+        let usersCatalog = {};
+        let broadcastChannel;
+        let activeUsers = {};
+        let currentRA = 0;
+        let currentDec = 0;
+
+        const markerShapes = {
+            'star': 'star',
+            'galaxy': 'circle',
+            'planet': 'square'
+        };
+
+        const markerEmojis = {
+            'star': '⭐',
+            'galaxy': '🌀',
+            'planet': '🪐'
+        };
+
+        // Initialize Aladin with error handling
+        function initAladin() {
+            // Check if A is defined
+            if (typeof A === 'undefined') {
+                console.error('Aladin Lite library not loaded');
+                $('#aladin-lite-div').html('<div style="color: white; padding: 50px; text-align: center;">Помилка завантаження Aladin Lite. Спробуйте перезавантажити сторінку.</div>');
+                return;
+            }
+            
+            try {
+                // Try to initialize Aladin
+                aladin = A.aladin('#aladin-lite-div', {
+                survey: 'P/DSS2/color',
+                fov: 60,
+                target: 'M31',
+                reticleColor: '#ff0000',
+                reticleSize: 32,
+                showReticle: false,
+                showZoomControl: true,
+                showFullscreenControl: true,
+                showLayersControl: true,
+                showGotoControl: true,
+                showShareControl: false,
+                showCatalogWidget: false,
+                showFrame: true,
+                showCooGrid: true
+            });
+
+            // Add event listeners for mouse movement
+            aladin.on('positionChanged', function(ra, dec) {
+                if (typeof ra === 'number' && typeof dec === 'number') {
+                    currentRA = ra;
+                    currentDec = dec;
+                    $('#ra').text(ra.toFixed(4) + '°');
+                    $('#dec').text(dec.toFixed(4) + '°');
+                }
+            });
+            
+            // Alternative: track mouse position
+            aladin.on('mouseMove', function(ra, dec) {
+                if (typeof ra === 'number' && typeof dec === 'number') {
+                    currentRA = ra;
+                    currentDec = dec;
+                    $('#ra').text(ra.toFixed(4) + '°');
+                    $('#dec').text(dec.toFixed(4) + '°');
+                }
+            });
+            
+            // Track click position for marker placement
+            $('#aladin-lite-div').on('click', function(e) {
+                const rect = this.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
+                
+                // Get coordinates from click position
+                try {
+                    const radec = aladin.pix2world(x, y);
+                    if (radec && radec.length >= 2) {
+                        currentRA = radec[0];
+                        currentDec = radec[1];
+                        $('#ra').text(currentRA.toFixed(4) + '°');
+                        $('#dec').text(currentDec.toFixed(4) + '°');
+                    }
+                } catch (err) {
+                    console.log('Click position:', x, y);
+                }
+            });
+
+            aladin.on('objectClicked', function(object) {
+                if (object && object.data) {
+                    const data = object.data;
+                    if (data.author && data.text) {
+                        alert(`${markerEmojis[data.type] || '📍'} Мітка від ${data.author}\n\n${data.text}`);
+                    }
+                }
+            });
+
+            // Load existing markers
+            loadMarkers();
+            
+            // Set initial coordinates to center
+            const center = aladin.getRaDec();
+            if (center && center.length >= 2) {
+                currentRA = center[0];
+                currentDec = center[1];
+                $('#ra').text(currentRA.toFixed(4) + '°');
+                $('#dec').text(currentDec.toFixed(4) + '°');
+            }
+            } catch (error) {
+                console.error('Error initializing Aladin:', error);
+                $('#aladin-lite-div').html('<div style="color: white; padding: 50px; text-align: center;">Помилка ініціалізації Aladin Lite: ' + error.message + '</div>');
+            }
+        }
+
+        // Create catalog for user
+        function createUserCatalog(userIdKey, color) {
+            if (!usersCatalog[userIdKey]) {
+                const catalog = A.catalog({
+                    name: userIdKey,
+                    sourceSize: 16,
+                    color: color,
+                    onClick: 'showPopup'
+                });
+                aladin.addCatalog(catalog);
+                usersCatalog[userIdKey] = catalog;
+            }
+            return usersCatalog[userIdKey];
+        }
+
+        // Add marker to map
+        function addMarkerToMap(markerData, broadcast = true) {
+            const catalog = createUserCatalog(markerData.userId, markerData.color);
+            
+            const source = A.source(markerData.ra, markerData.dec, {
+                author: markerData.author,
+                text: markerData.text,
+                type: markerData.type,
+                color: markerData.color,
+                userId: markerData.userId,
+                timestamp: markerData.timestamp,
+                id: markerData.id
+            });
+            
+            catalog.addSources([source]);
+
+            if (broadcast && broadcastChannel) {
+                broadcastChannel.postMessage({
+                    type: 'newMarker',
+                    marker: markerData,
+                    user: {
+                        id: userId,
+                        name: username,
+                        color: userColor
+                    }
+                });
+            }
+
+            updateMarkerCount();
+        }
+
+        // Load all markers
+        function loadMarkers() {
+            markersData.forEach(marker => {
+                addMarkerToMap(marker, false);
+            });
+            updateMarkerCount();
+        }
+
+        // Save markers to localStorage
+        function saveMarkers() {
+            localStorage.setItem('markersData', JSON.stringify(markersData));
+        }
+
+        // Update marker count
+        function updateMarkerCount() {
+            const totalMarkers = markersData.length;
+            $('#marker-count').text(`${totalMarkers} ${totalMarkers === 1 ? 'мітка' : 'міток'}`);
+        }
+
+        // Initialize broadcast channel for multiplayer
+        function initBroadcast() {
+            broadcastChannel = new BroadcastChannel('aladin_multiplayer');
+            
+            broadcastChannel.onmessage = function(event) {
+                const data = event.data;
+                
+                switch(data.type) {
+                    case 'newMarker':
+                        if (data.marker.userId !== userId) {
+                            markersData.push(data.marker);
+                            saveMarkers();
+                            addMarkerToMap(data.marker, false);
+                        }
+                        if (data.user) {
+                            activeUsers[data.user.id] = data.user;
+                            updateUsersList();
+                        }
+                        break;
+                        
+                    case 'userJoined':
+                        activeUsers[data.user.id] = data.user;
+                        updateUsersList();
+                        // Send our markers to the new user
+                        const myMarkers = markersData.filter(m => m.userId === userId);
+                        if (myMarkers.length > 0) {
+                            broadcastChannel.postMessage({
+                                type: 'markersSync',
+                                markers: myMarkers,
+                                user: {
+                                    id: userId,
+                                    name: username,
+                                    color: userColor
+                                }
+                            });
+                        }
+                        break;
+                        
+                    case 'markersSync':
+                        data.markers.forEach(marker => {
+                            if (!markersData.find(m => m.id === marker.id)) {
+                                markersData.push(marker);
+                                addMarkerToMap(marker, false);
+                            }
+                        });
+                        saveMarkers();
+                        if (data.user) {
+                            activeUsers[data.user.id] = data.user;
+                            updateUsersList();
+                        }
+                        break;
+                        
+                    case 'clearUserMarkers':
+                        markersData = markersData.filter(m => m.userId !== data.userId);
+                        saveMarkers();
+                        if (usersCatalog[data.userId]) {
+                            usersCatalog[data.userId].clear();
+                        }
+                        updateMarkerCount();
+                        break;
+                }
+            };
+
+            // Announce our presence
+            setTimeout(() => {
+                broadcastChannel.postMessage({
+                    type: 'userJoined',
+                    user: {
+                        id: userId,
+                        name: username || 'Анонім',
+                        color: userColor
+                    }
+                });
+            }, 500);
+        }
+
+        // Update active users list
+        function updateUsersList() {
+            const usersDiv = $('#users');
+            usersDiv.empty();
+            
+            Object.values(activeUsers).forEach(user => {
+                if (user.id !== userId) {
+                    usersDiv.append(`
+                        <div class="user-item">
+                            <div class="user-color" style="background: ${user.color}"></div>
+                            <div class="user-name">${user.name || 'Анонім'}</div>
+                        </div>
+                    `);
+                }
+            });
+        }
+
+        // Wait for Aladin library and WASM to load
+        function waitForAladin(callback, attempts = 0) {
+            if (typeof A !== 'undefined' && A.aladin) {
+                // Additional delay for WASM initialization in Firefox
+                if (navigator.userAgent.indexOf('Firefox') !== -1) {
+                    setTimeout(callback, 1000);
+                } else {
+                    callback();
+                }
+            } else if (attempts < 30) { // Increased attempts for Firefox
+                setTimeout(() => waitForAladin(callback, attempts + 1), 500);
+            } else {
+                console.error('Failed to load Aladin Lite after 15 seconds');
+                $('#aladin-lite-div').html('<div style="color: white; padding: 50px; text-align: center;">Не вдалося завантажити Aladin Lite. Перезавантажте сторінку.</div>');
+            }
+        }
+
+        // Initialize app
+        function initApp() {
+            // Load saved settings
+            $('#username').val(username);
+            $('#userColor').val(userColor);
+
+            // Wait for Aladin to load, then initialize
+            waitForAladin(function() {
+                initAladin();
+                // Initialize broadcast channel after Aladin is ready
+                initBroadcast();
+            });
+            
+            // Toggle controls
+            $('#toggle-controls').click(function() {
+                $('#controls').toggleClass('collapsed');
+                $(this).text($('#controls').hasClass('collapsed') ? '☰' : '✕');
+            });
+
+            // Save username
+            $('#username').on('input', function() {
+                username = $(this).val();
+                localStorage.setItem('username', username);
+            });
+
+            // Save color
+            $('#userColor').on('change', function() {
+                userColor = $(this).val();
+                localStorage.setItem('userColor', userColor);
+            });
+
+            // Marker type selection
+            $('.type-btn').click(function() {
+                $('.type-btn').removeClass('active');
+                $(this).addClass('active');
+                markerType = $(this).data('type');
+            });
+
+            // Add marker
+            $('#addMarker').click(function() {
+                const name = username || 'Анонім';
+                const text = $('#markerText').val();
+                
+                const markerData = {
+                    id: Date.now() + '_' + Math.random().toString(36).substr(2, 9),
+                    ra: currentRA,
+                    dec: currentDec,
+                    author: name,
+                    text: text,
+                    type: markerType,
+                    color: userColor,
+                    userId: userId,
+                    timestamp: Date.now()
+                };
+
+                markersData.push(markerData);
+                saveMarkers();
+                addMarkerToMap(markerData);
+                
+                $('#markerText').val('');
+                
+                // Visual feedback
+                $(this).text('✓ Додано!');
+                setTimeout(() => {
+                    $(this).text('📍 Додати мітку');
+                }, 1500);
+            });
+
+            // Clear my markers
+            $('#clearMyMarkers').click(function() {
+                if (confirm('Видалити всі ваші мітки?')) {
+                    markersData = markersData.filter(m => m.userId !== userId);
+                    saveMarkers();
+                    
+                    if (usersCatalog[userId]) {
+                        usersCatalog[userId].clear();
+                    }
+                    
+                    broadcastChannel.postMessage({
+                        type: 'clearUserMarkers',
+                        userId: userId
+                    });
+                    
+                    updateMarkerCount();
+                    
+                    $(this).text('✓ Очищено!');
+                    setTimeout(() => {
+                        $(this).text('🗑️ Очистити мої мітки');
+                    }, 1500);
+                }
+            });
+
+            // Handle window resize for mobile
+            function handleResize() {
+                if (window.innerWidth < 640) {
+                    $('#controls').addClass('collapsed');
+                    $('#toggle-controls').text('☰');
+                }
+            }
+
+            $(window).resize(handleResize);
+            handleResize();
+
+            // Prevent zoom on mobile
+            document.addEventListener('touchmove', function (event) {
+                if (event.scale !== 1) {
+                    event.preventDefault();
+                }
+            }, { passive: false });
+
+            // Double tap to add marker on mobile
+            let lastTap = 0;
+            $('#aladin-lite-div').on('touchend', function(e) {
+                const currentTime = new Date().getTime();
+                const tapLength = currentTime - lastTap;
+                if (tapLength < 500 && tapLength > 0) {
+                    $('#addMarker').click();
+                    e.preventDefault();
+                }
+                lastTap = currentTime;
+            });
+        }
+        
+        // Document ready - use different approach for Firefox
+        if (navigator.userAgent.indexOf('Firefox') !== -1) {
+            // For Firefox, wait for full page load
+            window.addEventListener('load', function() {
+                setTimeout(initApp, 500); // Extra delay for WASM
+            });
+        } else {
+            // For other browsers
+            $(document).ready(initApp);
+        }
+    </script>
+</body>
+</html>
