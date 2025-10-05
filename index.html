@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Aladin Lite - Mars Tour (Advanced)</title>
+  <style>
+    html,
+    body {
+      height: 100%;
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      font-family: Arial, sans-serif;
+    }
+
+    #aladin-lite-div {
+      width: 100%;
+      height: 100%;
+    }
+
+    .tour-controls {
+      position: absolute;
+      bottom: 30px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      gap: 15px;
+      background: rgba(0, 0, 0, 0.8);
+      padding: 15px;
+      border-radius: 10px;
+      z-index: 1000;
+    }
+
+    .tour-controls button {
+      padding: 12px 24px;
+      background: linear-gradient(135deg, rgba(139, 69, 69, 0.9) 0%, rgba(160, 82, 45, 0.9) 100%);
+      color: white;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: bold;
+      transition: all 0.3s ease;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+    }
+
+    .tour-controls button:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(139, 69, 69, 0.4);
+      background: linear-gradient(135deg, rgba(160, 82, 45, 0.9) 0%, rgba(139, 69, 69, 0.9) 100%);
+    }
+
+    .tour-controls button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .tour-info {
+      position: absolute;
+      top: 100px;
+      right: 30px;
+      background: linear-gradient(135deg, rgba(0, 0, 0, 0.9) 0%, rgba(50, 0, 0, 0.9) 100%);
+      color: white;
+      padding: 20px;
+      border-radius: 10px;
+      max-width: 350px;
+      z-index: 1000;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+    }
+
+    .tour-info h2 {
+      margin-top: 0;
+      color: #d97f7f;
+      font-size: 24px;
+    }
+
+    .tour-info p {
+      line-height: 1.6;
+      color: #e0e0e0;
+    }
+
+    /* Removed separate tour-progress styles as it's integrated */
+    .tour-progress-old {
+      position: absolute;
+      top: 30px;
+      left: 30px;
+      background: rgba(0, 0, 0, 0.8);
+      color: white;
+      padding: 15px;
+      border-radius: 10px;
+      z-index: 1000;
+    }
+
+    .progress-bar {
+      width: 100%;
+      height: 6px;
+      background: rgba(255, 255, 255, 0.2);
+      border-radius: 3px;
+      overflow: hidden;
+      margin-top: 10px;
+    }
+
+    .progress-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #ff6b6b 0%, #feca57 100%);
+      transition: width 0.3s ease;
+    }
+
+    .step-indicator {
+      display: flex;
+      margin-top: 10px;
+      gap: 4px;
+      margin-top: 10px;
+      justify-content: space-between;
+      width: 100%;
+    }
+
+    .step-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.3);
+      transition: all 0.3s ease;
+    }
+
+    .step-dot.active {
+      background: #ff6b6b;
+      transform: scale(1.3);
+    }
+
+    .step-dot.completed {
+      background: #feca57;
+    }
+  </style>
+</head>
+
+<body>
+  <div id="aladin-lite-div"></div>
+
+
+  <div class="tour-info" id="tourInfo" style="display: none;">
+    <h2 id="stepName">Tour Step</h2>
+    <p id="stepDescription">Description</p>
+    <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid rgba(255,255,255,0.2);">
+      <div style="font-size: 12px; opacity: 0.7;">COORDINATES</div>
+      <div style="font-family: monospace; margin-top: 5px;">
+        RA: <span id="stepRa">0.00</span>° | Dec: <span id="stepDec">0.00</span>°
+      </div>
+      <div style="font-size: 12px; opacity: 0.7; margin-top: 10px;">FIELD OF VIEW</div>
+      <div style="font-family: monospace; margin-top: 5px;">
+        <span id="stepFov">0</span>°
+      </div>
+    </div>
+
+    <!-- Progress section moved here -->
+    <div style="margin-top: 20px; padding-top: 15px; border-top: 1px solid rgba(255,255,255,0.2);">
+      <div style="font-size: 11px; opacity: 0.7; text-transform: uppercase; letter-spacing: 1px;">Tour Progress</div>
+      <div style="font-weight: bold; margin-top: 8px; font-size: 14px;">
+        Step <span id="currentStep">1</span> of <span id="totalSteps">8</span>
+      </div>
+      <div class="progress-bar" style="margin-top: 10px;">
+        <div class="progress-fill" id="progressFill" style="width: 0%;"></div>
+      </div>
+      <div class="step-indicator" id="stepIndicator" style="margin-top: 10px;"></div>
+    </div>
+  </div>
+
+  <div class="tour-controls">
+    <button id="startBtn">Start Mars Tour</button>
+    <button id="pauseBtn" style="display: none;">Pause</button>
+    <button id="stopBtn" style="display: none;">Stop</button>
+    <button id="prevBtn" style="display: none;">Previous</button>
+    <button id="nextBtn" style="display: none;">Next</button>
+  </div>
+
+  <script type="module">
+    import A from '../src/js/A.js';
+
+    let aladin;
+    let tour;
+
+    A.init.then(() => {
+      aladin = A.aladin('#aladin-lite-div', {
+        fov: 180,
+        projection: 'SIN',
+        cooFrame: 'j2000d',
+        target: '0 0',
+        showReticle: false,
+        showZoomControl: true,
+        showFullscreenControl: true,
+        showLayersControl: true,
+        showGotoControl: false,
+        showShareControl: false,
+        showCatalog: false,
+        reticleColor: 'rgb(255, 107, 107)',
+        reticleSize: 32,
+        showUI: false
+      });
+
+      // Set Mars survey
+      var mars = aladin.createImageSurvey('Mars', 'Mars', 'https://alasky.u-strasbg.fr/Planets/Mars_Viking_MDIM21/', 'j2000', 5);
+      aladin.setImageSurvey(mars);
+
+      // Common animation parameters for all tour steps
+      const commonStepParams = {
+        transitionFov: 180,
+        zoomOutDuration: 3,
+        moveDuration: 3,
+        zoomInDuration: 3,
+        duration: 4
+      };
+
+      // Mars tour locations (minimal data, common params will be merged)
+      const marsLocations = [
+        {
+          name: "Welcome to Mars",
+          ra: 0,
+          dec: 0,
+          fov: 180,
+          description: "Welcome to the Red Planet! This tour will take you through Mars' most spectacular geological features, from towering volcanoes to deep canyons."
+        },
+        {
+          name: "Olympus Mons",
+          ra: 226.2,
+          dec: 18.65,
+          fov: 5,
+          description: "The largest volcano in the solar system! Standing 21.9 km tall (nearly 3 times Mount Everest), with a base diameter of 600 km. Its caldera complex spans 80 km."
+        },
+        {
+          name: "Tharsis Montes",
+          ra: 247,
+          dec: 1,
+          fov: 20,
+          description: "The Tharsis volcanic plateau hosts three massive shield volcanoes: Ascraeus Mons, Pavonis Mons, and Arsia Mons. This bulge deformed Mars' entire surface."
+        },
+        {
+          name: "Valles Marineris",
+          ra: 284,
+          dec: -14,
+          fov: 15,
+          description: "Mars' Grand Canyon! This vast canyon system stretches 4,000 km long, 200 km wide, and up to 7 km deep. It would span the entire United States."
+        },
+        {
+          name: "Hellas Planitia",
+          ra: 70,
+          dec: -42.5,
+          fov: 20,
+          description: "A massive impact basin, one of the largest in the solar system at 2,300 km across and 7 km deep. It significantly affects Mars' weather patterns."
+        },
+        {
+          name: "Elysium Mons",
+          ra: 147,
+          dec: 25,
+          fov: 8,
+          description: "The second largest volcanic region on Mars. Elysium Mons rises 13.9 km above the surrounding plains, with recent volcanic activity detected."
+        },
+        {
+          name: "North Polar Ice Cap",
+          ra: 0,
+          dec: 85,
+          fov: 25,
+          description: "The northern polar ice cap consists of water ice with a seasonal covering of CO2 frost. It's about 1,000 km across and contains massive spiral troughs."
+        },
+        {
+          name: "Chryse Planitia",
+          ra: 320,
+          dec: 20,
+          fov: 12,
+          description: "A historic landing site! Viking 1 (1976), Mars Pathfinder (1997), and the fictional 'The Martian' landing occurred here. Ancient river channels flow into this basin."
+        },
+        {
+          name: "Argyre Planitia",
+          ra: 316,
+          dec: -50,
+          fov: 18,
+          description: "The second largest impact basin on Mars, roughly 1,800 km in diameter. It may have once held a large lake during Mars' warmer, wetter past."
+        },
+        {
+          name: "Alba Mons",
+          ra: 250,
+          dec: 40,
+          fov: 30,
+          description: "One of the most unique volcanoes in the solar system - extremely wide (1,600 km) but very low (only 6.8 km tall), giving it an unusually gentle slope."
+        },
+        {
+          name: "South Polar Ice Cap",
+          ra: 0,
+          dec: -85,
+          fov: 25,
+          description: "The southern ice cap is smaller but thicker than its northern counterpart, with permanent CO2 ice. A liquid water lake was discovered beneath it!"
+        },
+        {
+          name: "Tour Complete",
+          ra: 0,
+          dec: 0,
+          fov: 180,
+          description: "Thank you for exploring Mars! From massive volcanoes to deep canyons, from polar ice caps to ancient impact basins - Mars truly is a world of wonders.",
+          duration: 3
+        }
+      ];
+
+      // Merge common parameters with each location
+      const tourSteps = marsLocations.map(location => ({
+        ...commonStepParams,
+        ...location
+      }));
+
+      // Initialize step indicators
+      const stepIndicatorDiv = document.getElementById('stepIndicator');
+      tourSteps.forEach(() => {
+        const dot = document.createElement('div');
+        dot.className = 'step-dot';
+        stepIndicatorDiv.appendChild(dot);
+      });
+
+      // Create tour (make it global for debugging)
+      window.tour = tour = new A.Tour(aladin, tourSteps, {
+        loop: true,
+        defaultDuration: 4,
+        autoStart: false,
+        showUI: false,
+        onStart: () => {
+          document.getElementById('tourInfo').style.display = 'block';
+          document.getElementById('startBtn').style.display = 'none';
+          document.getElementById('pauseBtn').style.display = 'inline-block';
+          document.getElementById('stopBtn').style.display = 'inline-block';
+          document.getElementById('prevBtn').style.display = 'inline-block';
+          document.getElementById('nextBtn').style.display = 'inline-block';
+          document.getElementById('totalSteps').textContent = tourSteps.length;
+
+          // Don't show empty initial state - will be updated by onStepChange
+        },
+        onStop: () => {
+          document.getElementById('tourInfo').style.display = 'none';
+          document.getElementById('startBtn').style.display = 'inline-block';
+          document.getElementById('startBtn').textContent = 'Restart Tour';
+          document.getElementById('pauseBtn').style.display = 'none';
+          document.getElementById('stopBtn').style.display = 'none';
+          document.getElementById('prevBtn').style.display = 'none';
+          document.getElementById('nextBtn').style.display = 'none';
+
+          // Reset step indicators
+          document.querySelectorAll('.step-dot').forEach(dot => {
+            dot.classList.remove('active', 'completed');
+          });
+        },
+        onStepChange: (index, step) => {
+          // Update info panel
+          document.getElementById('stepName').textContent = step.name || `Location ${index + 1}`;
+          document.getElementById('stepDescription').textContent = step.description || '';
+          document.getElementById('stepRa').textContent = step.ra.toFixed(2);
+          document.getElementById('stepDec').textContent = step.dec.toFixed(2);
+          document.getElementById('stepFov').textContent = (step.fov || 90).toFixed(1);
+
+          // Update progress
+          document.getElementById('currentStep').textContent = index + 1;
+          const progress = ((index + 1) / tourSteps.length) * 100;
+          document.getElementById('progressFill').style.width = progress + '%';
+
+          // Update step indicators
+          const dots = document.querySelectorAll('.step-dot');
+          dots.forEach((dot, i) => {
+            dot.classList.remove('active');
+            if (i < index) {
+              dot.classList.add('completed');
+            } else if (i === index) {
+              dot.classList.add('active');
+            } else {
+              dot.classList.remove('completed');
+            }
+          });
+        },
+        onComplete: () => {
+          // Just stop the tour, no alert
+          tour.stop();
+        }
+      });
+
+      // Control buttons
+      document.getElementById('startBtn').addEventListener('click', () => tour.start());
+      document.getElementById('pauseBtn').addEventListener('click', () => {
+        if (tour.getIsPaused()) {
+          tour.resume();
+          document.getElementById('pauseBtn').innerHTML = 'Pause';
+        } else {
+          tour.pause();
+          document.getElementById('pauseBtn').innerHTML = 'Resume';
+        }
+      });
+      document.getElementById('stopBtn').addEventListener('click', () => tour.stop());
+      document.getElementById('prevBtn').addEventListener('click', () => tour.previous());
+      document.getElementById('nextBtn').addEventListener('click', () => tour.next());
+
+      // Keyboard support for arrow keys and space  
+      document.addEventListener('keydown', (e) => {
+        if (e.code === 'Space') {
+          e.preventDefault();
+
+          if (!tour.getIsPlaying()) {
+            // Tour not started yet - start it in paused state
+            tour.start();
+            // Force pause on first step to prevent auto-play
+            requestAnimationFrame(() => {
+              tour.pause();
+              document.getElementById('pauseBtn').innerHTML = 'Resume';
+            });
+          } else {
+            // Tour is playing - delegate to the pause/resume button
+            document.getElementById('pauseBtn').click();
+          }
+        } else if (e.code === 'ArrowLeft') {
+          e.preventDefault();
+          if (tour.getIsPlaying()) {
+            tour.previous();
+          }
+        } else if (e.code === 'ArrowRight') {
+          e.preventDefault();
+          if (tour.getIsPlaying()) {
+            tour.next();
+          }
+        }
+      });
+    });
+  </script>
+</body>
+
+</html>
