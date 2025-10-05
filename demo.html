@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Astoura: Interactive Astronomy Tours</title>
+
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@4.3.1/dist/reset.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@4.3.1/dist/reveal.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@4.3.1/dist/theme/moon.css">
+
+  <style>
+    .reveal h1,
+    .reveal h2,
+    .reveal h3 {
+      color: #ff6b6b;
+      text-transform: none;
+    }
+
+    .reveal .progress {
+      color: #ff6b6b;
+    }
+
+    .feature-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 40px;
+      margin-top: 50px;
+    }
+
+    .feature-box {
+      background: rgba(255, 255, 255, 0.1);
+      padding: 30px;
+      border-radius: 15px;
+      text-align: center;
+    }
+
+    .highlight-box {
+      background: linear-gradient(135deg, rgba(255, 107, 107, 0.2), rgba(254, 202, 87, 0.2));
+      padding: 40px;
+      border-radius: 15px;
+      margin: 30px 0;
+    }
+
+    .demo-links a {
+      display: inline-block;
+      margin: 15px;
+      padding: 20px 40px;
+      background: linear-gradient(135deg, #ff6b6b, #feca57);
+      color: white;
+      text-decoration: none;
+      border-radius: 30px;
+      font-size: 1.2em;
+      transition: transform 0.3s;
+    }
+
+    .demo-links a:hover {
+      transform: scale(1.1);
+    }
+
+    .big-text {
+      font-size: 1.3em;
+      line-height: 1.5;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="reveal">
+    <div class="slides">
+
+      <!-- 1. Title Slide -->
+      <section>
+        <h1 style="font-size: 1.8em;">🌌 Astoura</h1>
+        <h2 style="font-size: 1.3em; margin-top: 30px;">Interactive Astronomy Tours</h2>
+        <p style="font-size: 1.2em; margin-top: 80px; margin-bottom: 120px;">
+          <strong>Share your favorite cosmic locations</strong>
+        </p>
+        <p style="position: absolute;  left: 50%; transform: translateX(-50%);">
+          <a href="https://astoura.org" style="color: #feca57; font-size: 1.1em;">astoura.org</a>
+        </p>
+      </section>
+
+      <!-- 2. Problem -->
+      <section>
+        <h1 style="font-size: 1.8em;">Problem</h1>
+        <div class="highlight-box">
+          <p style="font-size: 1em;"><strong>Space data isn't just overwhelming -<br>it lacks meaning for most people</strong></p>
+        </div>
+        <div style="margin-top: 50px;" class="fragment">
+          <p style="font-size: 1.1em; color: #feca57;">We need stories, not just coordinates</p>
+          <p style="font-size: 1.1em; color: #ff6b6b;" class="fragment">We need shared experiences, not solo exploration</p>
+        </div>
+        <!-- <p style="position: absolute; bottom: 10px; right: 20px; font-size: 0.7em; opacity: 0.6;">* NASA/JPL-Caltech/MSSS</p> -->
+      </section>
+
+      <!-- 3. Solution -->
+      <section>
+        <h1 style="font-size: 1.8em;">✨ Solution</h1>
+        <div class="feature-grid">
+          <div class="feature-box fragment">
+            <h3 style="font-size: 1.3em;">🎯 Tour Engine</h3>
+            <p style="font-size: 0.9em;">Automated journeys through space</p>
+          </div>
+          <div class="feature-box fragment">
+            <h3 style="font-size: 1.3em;">👥 Community</h3>
+            <p style="font-size: 0.9em;">Create & share your tours</p>
+          </div>
+        </div>
+        <div class="fragment" style="margin-top: 40px;">
+          <p style="font-size: 1em; color: #feca57;">🚀 Contributing back to Aladin Lite</p>
+        </div>
+        <!-- <p style="position: absolute; bottom: 10px; right: 20px; font-size: 0.7em; opacity: 0.6;">* NASA/ESA/Hubble</p> -->
+      </section>
+
+      <!-- 4. Future -->
+      <section>
+        <h1 style="font-size: 1.8em;">🚀 Coming Soon</h1>
+        <div class="feature-grid" style="margin-top: 30px; grid-template-columns: 1fr 1fr; gap: 30px;">
+          <div class="highlight-box" style="padding: 20px;">
+            <h2 style="color: #feca57; font-size: 1.2em;">Multiplayer</h2>
+            <p style="font-size: 0.85em;">👥 Live tours together</p>
+            <p style="font-size: 0.85em;">🔬 Share discoveries</p>
+          </div>
+          <div class="highlight-box fragment" style="padding: 20px;">
+            <h2 style="color: #ff6b6b; font-size: 1.2em;">Space Games</h2>
+            <p style="font-size: 0.8em; white-space: nowrap;">🏴‍☠️ Treasure hunts on Mars!</p>
+            <p style="font-size: 0.8em; white-space: nowrap;">🌌 Hide-and-seek in nebulae</p>
+            <p style="font-size: 0.8em; white-space: nowrap;">⭐ Name a star challenge</p>
+          </div>
+        </div>
+        <!-- <p style="position: absolute; bottom: 10px; right: 20px; font-size: 0.7em; opacity: 0.6;">* NASA/JPL-Caltech</p> -->
+      </section>
+
+      <!-- 5. Vision -->
+      <section>
+        <h1 style="font-size: 1.8em;">🌌 Vision</h1>
+        <div class="feature-grid" style="margin-top: 40px; grid-template-columns: 1fr 1fr; gap: 40px;">
+          <div>
+            <h3 style="font-size: 1.2em; color: #feca57; margin-bottom: 20px;">🎯 Short-term</h3>
+            <p style="font-size: 0.9em; margin: 8px 0;" class="fragment">🏠 Screensavers</p>
+            <p style="font-size: 0.9em; margin: 8px 0;" class="fragment">⭐ Favourite locations</p>
+            <p style="font-size: 0.9em; margin: 8px 0;" class="fragment">👥 Share tours</p>
+            <p style="font-size: 0.9em; margin: 8px 0;" class="fragment">🎮 Mars games</p>
+          </div>
+          <div>
+            <h3 style="font-size: 1.2em; color: #ff6b6b; margin-bottom: 20px;">🚀 Long-term</h3>
+            <p style="font-size: 0.9em; margin: 8px 0;" class="fragment">🌐 Go-to platform</p>
+            <p style="font-size: 0.9em; margin: 8px 0;" class="fragment">🎓 Schools, museums</p>
+            <p style="font-size: 0.9em; margin: 8px 0;" class="fragment">🎮 Kahoot in space</p>
+            <p style="font-size: 0.9em; margin: 8px 0;" class="fragment">✨ "Figma meets NASA"</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- 6. Demo -->
+      <section data-background-gradient="linear-gradient(#2a1a4e, #1a1a3e)">
+        <p style="font-size: 1.1em; margin-bottom: 30px;">
+          Build your path through the universe
+        </p>
+        <div>
+          <iframe width="800" height="450" src="https://www.youtube.com/embed/qXsXQAAOaPU?autoplay=1&mute=1" frameborder="0"
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen>
+          </iframe>
+        </div>
+        <p style="margin-top: 30px; font-size: 1.1em;">
+          <a href="https://astoura.org" style="color: #feca57;">astoura.org</a>
+        </p>
+      </section>
+
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/reveal.js@4.3.1/dist/reveal.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/reveal.js@4.3.1/plugin/zoom/zoom.js"></script>
+
+  <script>
+    Reveal.initialize({
+      hash: true,
+      controls: true,
+      progress: true,
+      center: true,
+      transition: 'slide',
+      plugins: [RevealZoom]
+    });
+  </script>
+</body>
+
+</html>

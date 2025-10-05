@@ -12,6 +12,10 @@ Deno.serve(async (req: Request) => {
   }
 
   if (url.pathname === "/demo") {
+    return await serveFile(req, "./demo.html");
+  }
+
+  if (url.pathname === "/yt") {
     return Response.redirect("https://youtu.be/qXsXQAAOaPU", 302);
   }
 
