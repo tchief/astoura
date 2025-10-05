@@ -3,6 +3,10 @@ import { serveFile } from "jsr:@std/http/file-server";
 Deno.serve(async (req: Request) => {
   const url = new URL(req.url);
 
+  if (url.pathname === "/repo") {
+    return Response.redirect("https://github.com/tchief/astoura/tree/al-deno", 302);
+  }
+
   if (url.pathname.startsWith("/static/")) {
     return await serveFile(req, `.${url.pathname}`);
   }
