@@ -1,0 +1,518 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Space Markers - Космічна гра</title>
+    <script src="https://aladin.cds.unistra.fr/AladinLite/api/v3/latest/aladin.js" charset="utf-8"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background: #000;
+            color: #fff;
+            overflow: hidden;
+        }
+        
+        #aladin-lite-div {
+            width: 100vw;
+            height: 100vh;
+        }
+        
+        .ui-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            pointer-events: none;
+            z-index: 10;
+        }
+        
+        .top-panel {
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(10px);
+            border-radius: 12px;
+            padding: 15px 25px;
+            pointer-events: auto;
+            max-width: 600px;
+            width: 90%;
+        }
+        
+        .game-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 20px;
+        }
+        
+        .game-title {
+            font-size: 20px;
+            font-weight: bold;
+        }
+        
+        .player-info {
+            font-size: 14px;
+            opacity: 0.9;
+        }
+        
+        .color-palette {
+            display: flex;
+            gap: 8px;
+        }
+        
+        .color-btn {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            border: 2px solid transparent;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+        
+        .color-btn:hover {
+            transform: scale(1.1);
+        }
+        
+        .color-btn.active {
+            border-color: white;
+        }
+        
+        .marker-form {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.95);
+            backdrop-filter: blur(20px);
+            border-radius: 16px;
+            padding: 30px;
+            pointer-events: auto;
+            max-width: 400px;
+            width: 90%;
+            display: none;
+        }
+        
+        .marker-form.active {
+            display: block;
+        }
+        
+        .form-title {
+            font-size: 18px;
+            font-weight: bold;
+            margin-bottom: 20px;
+        }
+        
+        .form-group {
+            margin-bottom: 15px;
+        }
+        
+        .form-label {
+            display: block;
+            font-size: 14px;
+            margin-bottom: 5px;
+            opacity: 0.8;
+        }
+        
+        .form-input, .form-textarea {
+            width: 100%;
+            padding: 10px;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 8px;
+            color: white;
+            font-size: 14px;
+            outline: none;
+        }
+        
+        .form-input:focus, .form-textarea:focus {
+            border-color: rgba(255, 255, 255, 0.5);
+            background: rgba(255, 255, 255, 0.15);
+        }
+        
+        .form-buttons {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
+        
+        .btn {
+            flex: 1;
+            padding: 12px;
+            border: none;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            font-size: 14px;
+            transition: opacity 0.2s;
+        }
+        
+        .btn:hover {
+            opacity: 0.9;
+        }
+        
+        .btn-primary {
+            background: #3B82F6;
+            color: white;
+        }
+        
+        .btn-secondary {
+            background: #6B7280;
+            color: white;
+        }
+        
+        .bottom-panel {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(10px);
+            border-radius: 12px;
+            padding: 15px 25px;
+            pointer-events: auto;
+            max-width: 800px;
+            width: 90%;
+        }
+        
+        .markers-list {
+            display: flex;
+            gap: 10px;
+            overflow-x: auto;
+            padding: 5px 0;
+        }
+        
+        .marker-item {
+            flex-shrink: 0;
+            padding: 8px 12px;
+            border-radius: 8px;
+            font-size: 12px;
+            border: 1px solid;
+        }
+        
+        .info-message {
+            position: absolute;
+            top: 100px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(59, 130, 246, 0.9);
+            padding: 12px 20px;
+            border-radius: 8px;
+            pointer-events: none;
+            display: none;
+            animation: slideDown 0.3s ease-out;
+        }
+        
+        .info-message.active {
+            display: block;
+        }
+        
+        @keyframes slideDown {
+            from { 
+                opacity: 0;
+                transform: translate(-50%, -20px);
+            }
+            to {
+                opacity: 1;
+                transform: translate(-50%, 0);
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="aladin-lite-div"></div>
+    
+    <div class="ui-overlay">
+        <div class="top-panel">
+            <div class="game-header">
+                <div>
+                    <div class="game-title">🌌 Space Markers</div>
+                    <div class="player-info">
+                        Гравець: <span id="playerName">...</span> | 
+                        Маркерів зібрано: <span id="markerCount">0</span>
+                    </div>
+                </div>
+                <div class="color-palette" id="colorPalette">
+                    <!-- Colors will be added by JS -->
+                </div>
+            </div>
+        </div>
+        
+        <div class="marker-form" id="markerForm">
+            <div class="form-title">Додати маркер</div>
+            <div class="form-group">
+                <label class="form-label">Назва маркера</label>
+                <input type="text" class="form-input" id="markerName" placeholder="Моя знахідка...">
+            </div>
+            <div class="form-group">
+                <label class="form-label">Деталі (опціонально)</label>
+                <textarea class="form-textarea" id="markerDetails" rows="3" placeholder="Опис знахідки..."></textarea>
+            </div>
+            <div class="form-buttons">
+                <button class="btn btn-primary" onclick="addMarker()">Додати</button>
+                <button class="btn btn-secondary" onclick="closeMarkerForm()">Скасувати</button>
+            </div>
+        </div>
+        
+        <div class="info-message" id="infoMessage"></div>
+        
+        <div class="bottom-panel">
+            <div style="font-size: 14px; font-weight: bold; margin-bottom: 10px;">Ваші маркери:</div>
+            <div class="markers-list" id="markersList">
+                <!-- Markers will be added here -->
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        // Configuration
+        const colors = [
+            { name: "Червоний", value: "#FF4444" },
+            { name: "Синій", value: "#4444FF" },
+            { name: "Зелений", value: "#44FF44" },
+            { name: "Жовтий", value: "#FFFF44" },
+            { name: "Фіолетовий", value: "#FF44FF" },
+            { name: "Блакитний", value: "#44FFFF" },
+            { name: "Помаранчевий", value: "#FFA500" },
+        ];
+        
+        // State
+        let aladin = null;
+        let userId = localStorage.getItem('userId') || crypto.randomUUID();
+        let userName = localStorage.getItem('userName') || '';
+        let selectedColor = colors[0].value;
+        let markers = JSON.parse(localStorage.getItem('markers') || '[]');
+        let currentCoords = { ra: 0, dec: 0 };
+        let ws = null;
+        let allPlayersMarkers = [];
+        
+        // Save userId
+        localStorage.setItem('userId', userId);
+        
+        // Initialize
+        function init() {
+            // Get or set username
+            if (!userName) {
+                userName = prompt('Введіть ваше ім\'я:') || 'Анонім';
+                localStorage.setItem('userName', userName);
+            }
+            
+            document.getElementById('playerName').textContent = userName;
+            updateMarkerCount();
+            
+            // Initialize color palette
+            const palette = document.getElementById('colorPalette');
+            colors.forEach((color, index) => {
+                const btn = document.createElement('button');
+                btn.className = 'color-btn' + (index === 0 ? ' active' : '');
+                btn.style.backgroundColor = color.value;
+                btn.title = color.name;
+                btn.onclick = () => selectColor(color.value, btn);
+                palette.appendChild(btn);
+            });
+            
+            // Initialize Aladin
+            A.init.then(() => {
+                aladin = A.aladin('#aladin-lite-div', {
+                    survey: 'P/DSS2/color',
+                    fov: 60,
+                    target: 'Orion',
+                    showReticle: true,
+                    showCooGrid: false,
+                    showFrame: false,
+                    showFullscreenControl: true,
+                    showLayersControl: true,
+                    showGotoControl: true,
+                    showZoomControl: true
+                });
+                
+                // Add click handler
+                aladin.on('click', (object) => {
+                    if (!object) {
+                        // Clicked on sky
+                        const coords = aladin.getRaDec();
+                        currentCoords = { ra: coords[0], dec: coords[1] };
+                        openMarkerForm();
+                    } else if (object.data && object.data.markerId) {
+                        // Clicked on marker
+                        handleMarkerClick(object.data.markerId);
+                    }
+                });
+                
+                // Load existing markers
+                loadMarkers();
+                
+                // Connect WebSocket
+                connectWebSocket();
+            });
+        }
+        
+        function selectColor(color, button) {
+            selectedColor = color;
+            document.querySelectorAll('.color-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            button.classList.add('active');
+        }
+        
+        function openMarkerForm() {
+            document.getElementById('markerForm').classList.add('active');
+            document.getElementById('markerName').focus();
+        }
+        
+        function closeMarkerForm() {
+            document.getElementById('markerForm').classList.remove('active');
+            document.getElementById('markerName').value = '';
+            document.getElementById('markerDetails').value = '';
+        }
+        
+        function addMarker() {
+            const name = document.getElementById('markerName').value.trim();
+            if (!name) return;
+            
+            const marker = {
+                id: crypto.randomUUID(),
+                ra: currentCoords.ra,
+                dec: currentCoords.dec,
+                author: userName,
+                authorId: userId,
+                text: name,
+                color: selectedColor,
+                details: document.getElementById('markerDetails').value,
+                timestamp: Date.now()
+            };
+            
+            // Save locally
+            markers.push(marker);
+            localStorage.setItem('markers', JSON.stringify(markers));
+            updateMarkerCount();
+            updateMarkersList();
+            
+            // Add to map
+            renderMarkerOnMap(marker);
+            
+            // Send to server
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({ type: 'addMarker', marker }));
+            }
+            
+            closeMarkerForm();
+            showInfo('Маркер додано!');
+        }
+        
+        function renderMarkerOnMap(marker) {
+            if (!aladin) return;
+            
+            const cat = A.catalog({
+                name: `Маркер від ${marker.author}`,
+                sourceSize: 18,
+                color: marker.color
+            });
+            
+            aladin.addCatalog(cat);
+            
+            cat.addSources([
+                A.marker(marker.ra, marker.dec, {
+                    popupTitle: `${marker.author}: ${marker.text}`,
+                    popupDesc: marker.details || '',
+                    data: { markerId: marker.id }
+                })
+            ]);
+        }
+        
+        function handleMarkerClick(markerId) {
+            const marker = allPlayersMarkers.find(m => m.id === markerId);
+            if (marker && marker.authorId !== userId) {
+                // Collect marker from other player
+                markers.push(marker);
+                localStorage.setItem('markers', JSON.stringify(markers));
+                updateMarkerCount();
+                updateMarkersList();
+                showInfo(`Ви зібрали маркер від ${marker.author}: ${marker.text}`);
+            }
+        }
+        
+        function loadMarkers() {
+            markers.forEach(marker => renderMarkerOnMap(marker));
+            updateMarkersList();
+        }
+        
+        function updateMarkerCount() {
+            document.getElementById('markerCount').textContent = markers.length;
+        }
+        
+        function updateMarkersList() {
+            const list = document.getElementById('markersList');
+            list.innerHTML = '';
+            
+            markers.slice(-10).forEach(marker => {
+                const item = document.createElement('div');
+                item.className = 'marker-item';
+                item.style.backgroundColor = marker.color + '33';
+                item.style.borderColor = marker.color;
+                item.textContent = marker.text;
+                list.appendChild(item);
+            });
+        }
+        
+        function showInfo(message) {
+            const info = document.getElementById('infoMessage');
+            info.textContent = message;
+            info.classList.add('active');
+            setTimeout(() => {
+                info.classList.remove('active');
+            }, 3000);
+        }
+        
+        function connectWebSocket() {
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const wsUrl = `${protocol}//${window.location.host}/api/ws?userId=${userId}`;
+            
+            ws = new WebSocket(wsUrl);
+            
+            ws.onopen = () => {
+                console.log('WebSocket connected');
+                ws.send(JSON.stringify({ type: 'getAllMarkers' }));
+            };
+            
+            ws.onmessage = (event) => {
+                const data = JSON.parse(event.data);
+                
+                if (data.type === 'newMarker' && data.marker.authorId !== userId) {
+                    allPlayersMarkers.push(data.marker);
+                    renderMarkerOnMap(data.marker);
+                    showInfo(`Новий маркер від ${data.marker.author}!`);
+                } else if (data.type === 'allMarkers') {
+                    allPlayersMarkers = data.markers;
+                    data.markers.forEach(marker => {
+                        if (marker.authorId !== userId) {
+                            renderMarkerOnMap(marker);
+                        }
+                    });
+                }
+            };
+            
+            ws.onerror = (error) => {
+                console.error('WebSocket error:', error);
+            };
+            
+            ws.onclose = () => {
+                console.log('WebSocket closed');
+                setTimeout(connectWebSocket, 3000);
+            };
+        }
+        
+        // Start
+        window.onload = init;
+    </script>
+</body>
+</html>

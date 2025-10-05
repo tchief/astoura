@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebSocket Мультиплеєр</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .status {
+            text-align: center;
+            padding: 10px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            font-weight: bold;
+        }
+        .status.connected {
+            background: #d4edda;
+            color: #155724;
+        }
+        .status.connecting {
+            background: #fff3cd;
+            color: #856404;
+        }
+        .status.disconnected {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        .controls {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        input {
+            grid-column: 1 / -1;
+            padding: 12px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-size: 16px;
+        }
+        input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        button {
+            padding: 12px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: transform 0.2s;
+            font-weight: bold;
+        }
+        button:hover {
+            transform: scale(1.05);
+        }
+        button:active {
+            transform: scale(0.95);
+        }
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        .btn-secondary {
+            background: #6c757d;
+            color: white;
+        }
+        #usersList {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            min-height: 100px;
+        }
+        .user-item {
+            display: flex;
+            align-items: center;
+            padding: 8px;
+            margin: 5px 0;
+            background: white;
+            border-radius: 5px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .user-color {
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            margin-right: 10px;
+        }
+        .user-name {
+            flex: 1;
+            font-weight: bold;
+        }
+        .user-id {
+            color: #666;
+            font-size: 12px;
+        }
+        #messages {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        .message {
+            padding: 8px 12px;
+            margin: 5px 0;
+            background: white;
+            border-left: 4px solid #667eea;
+            border-radius: 0 5px 5px 0;
+            font-size: 14px;
+        }
+        .message.error {
+            border-left-color: #dc3545;
+            background: #fff5f5;
+        }
+        .message.success {
+            border-left-color: #28a745;
+            background: #f5fff5;
+        }
+        .message.info {
+            border-left-color: #17a2b8;
+            background: #f0f8ff;
+        }
+        .server-info {
+            margin-bottom: 20px;
+            padding: 15px;
+            background: #e8f4f8;
+            border-radius: 8px;
+        }
+        .server-info input {
+            width: 100%;
+            margin-top: 10px;
+        }
+        @media (max-width: 600px) {
+            .controls {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🌐 WebSocket Мультиплеєр</h1>
+        
+        <div id="status" class="status disconnected">❌ Відключено</div>
+        
+        <div class="server-info">
+            <strong>WebSocket сервер:</strong>
+            <input type="text" id="wsUrl" value="ws://localhost:8082" placeholder="ws://localhost:8082">
+            <button class="btn-primary" onclick="connectToServer()" style="width: 100%; margin-top: 10px;">Підключитися</button>
+        </div>
+        
+        <div class="controls">
+            <input type="text" id="userName" placeholder="Введіть ваше ім'я">
+            <input type="color" id="userColor" value="#667eea">
+            <button class="btn-primary" onclick="sendUserInfo()">📝 Оновити інформацію</button>
+            <button class="btn-secondary" onclick="sendPing()">🏓 Ping</button>
+        </div>
+        
+        <div id="usersList">
+            <h3>👥 Користувачі онлайн:</h3>
+            <div id="usersContainer">
+                <div style="color: #999; text-align: center;">Підключіться до сервера</div>
+            </div>
+        </div>
+        
+        <div id="messages">
+            <h3>📨 Лог подій:</h3>
+            <div id="messagesContainer"></div>
+        </div>
+    </div>
+
+    <script>
+        // User data
+        const userId = 'user_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5);
+        let userName = localStorage.getItem('userName') || 'Користувач';
+        let userColor = localStorage.getItem('userColor') || '#667eea';
+        let ws = null;
+        let serverClientId = null;
+        let users = {};
+        let reconnectTimeout = null;
+        
+        // Load saved settings
+        document.getElementById('userName').value = userName;
+        document.getElementById('userColor').value = userColor;
+        
+        // Add message to log
+        function addMessage(text, type = 'info') {
+            const container = document.getElementById('messagesContainer');
+            const msg = document.createElement('div');
+            msg.className = 'message ' + type;
+            msg.innerHTML = `<strong>[${new Date().toLocaleTimeString()}]</strong> ${text}`;
+            container.appendChild(msg);
+            container.scrollTop = container.scrollHeight;
+            
+            // Keep only last 50 messages
+            while (container.children.length > 50) {
+                container.removeChild(container.firstChild);
+            }
+        }
+        
+        // Update users list
+        function updateUsersList() {
+            const container = document.getElementById('usersContainer');
+            const userCount = Object.keys(users).length;
+            
+            if (userCount === 0) {
+                container.innerHTML = '<div style="color: #999; text-align: center;">Немає інших користувачів</div>';
+            } else {
+                container.innerHTML = '';
+                for (const [id, user] of Object.entries(users)) {
+                    const userDiv = document.createElement('div');
+                    userDiv.className = 'user-item';
+                    userDiv.innerHTML = `
+                        <div class="user-color" style="background: ${user.color}"></div>
+                        <div class="user-name">
+                            ${user.name}
+                            <div class="user-id">${user.id === userId ? '(Ви)' : ''}</div>
+                        </div>
+                    `;
+                    container.appendChild(userDiv);
+                }
+            }
+        }
+        
+        // Connect to WebSocket server
+        function connectToServer() {
+            const wsUrl = document.getElementById('wsUrl').value;
+            
+            if (ws) {
+                ws.close();
+            }
+            
+            clearTimeout(reconnectTimeout);
+            
+            document.getElementById('status').className = 'status connecting';
+            document.getElementById('status').textContent = '⏳ Підключення...';
+            addMessage('Підключення до ' + wsUrl + '...', 'info');
+            
+            try {
+                ws = new WebSocket(wsUrl);
+                
+                ws.onopen = function() {
+                    document.getElementById('status').className = 'status connected';
+                    document.getElementById('status').textContent = '✅ Підключено';
+                    addMessage('Підключено до сервера!', 'success');
+                    
+                    // Send initial user info
+                    setTimeout(() => {
+                        sendUserInfo();
+                    }, 100);
+                };
+                
+                ws.onmessage = function(event) {
+                    try {
+                        const data = JSON.parse(event.data);
+                        console.log('Received:', data);
+                        
+                        switch(data.type) {
+                            case 'welcome':
+                                serverClientId = data.clientId;
+                                addMessage(`Ваш ID на сервері: #${serverClientId}`, 'info');
+                                break;
+                                
+                            case 'userJoined':
+                                addMessage(`Користувач #${data.clientId} приєднався (Всього: ${data.totalUsers})`, 'success');
+                                break;
+                                
+                            case 'userLeft':
+                                addMessage(`Користувач #${data.clientId} вийшов (Всього: ${data.totalUsers})`, 'error');
+                                if (users[data.fromClient]) {
+                                    delete users[data.fromClient];
+                                    updateUsersList();
+                                }
+                                break;
+                                
+                            case 'userInfo':
+                                users[data.fromClient] = {
+                                    id: data.userId,
+                                    name: data.name,
+                                    color: data.color
+                                };
+                                updateUsersList();
+                                addMessage(`${data.name} оновив інформацію`, 'info');
+                                break;
+                                
+                            case 'ping':
+                                addMessage(`🏓 Ping від ${data.name || 'Користувач #' + data.fromClient}`, 'info');
+                                break;
+                        }
+                    } catch(err) {
+                        console.error('Error parsing message:', err);
+                    }
+                };
+                
+                ws.onclose = function() {
+                    document.getElementById('status').className = 'status disconnected';
+                    document.getElementById('status').textContent = '❌ Відключено';
+                    addMessage('З\'єднання втрачено', 'error');
+                    users = {};
+                    updateUsersList();
+                    
+                    // Auto-reconnect after 5 seconds
+                    reconnectTimeout = setTimeout(() => {
+                        addMessage('Спроба перепідключення...', 'info');
+                        connectToServer();
+                    }, 5000);
+                };
+                
+                ws.onerror = function(error) {
+                    console.error('WebSocket error:', error);
+                    addMessage('Помилка підключення', 'error');
+                };
+                
+            } catch(error) {
+                addMessage('Помилка створення WebSocket: ' + error.message, 'error');
+            }
+        }
+        
+        // Send user info
+        function sendUserInfo() {
+            userName = document.getElementById('userName').value.trim() || 'Користувач';
+            userColor = document.getElementById('userColor').value;
+            
+            localStorage.setItem('userName', userName);
+            localStorage.setItem('userColor', userColor);
+            
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({
+                    type: 'userInfo',
+                    userId: userId,
+                    name: userName,
+                    color: userColor
+                }));
+                addMessage('Інформацію оновлено', 'success');
+            } else {
+                addMessage('Немає з\'єднання з сервером', 'error');
+            }
+        }
+        
+        // Send ping
+        function sendPing() {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({
+                    type: 'ping',
+                    name: userName
+                }));
+                addMessage('🏓 Ping надіслано', 'info');
+            } else {
+                addMessage('Немає з\'єднання з сервером', 'error');
+            }
+        }
+        
+        // Auto-connect on load
+        window.addEventListener('load', function() {
+            // For ngrok or other hosts, detect the WebSocket URL
+            if (window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+                const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+                const wsUrl = `${wsProtocol}//${window.location.host}`;
+                document.getElementById('wsUrl').value = wsUrl;
+            }
+        });
+    </script>
+</body>
+</html>

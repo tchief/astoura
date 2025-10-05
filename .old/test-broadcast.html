@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Тест BroadcastChannel</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 600px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #f0f0f0;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+        }
+        .user-info {
+            background: #e8f4f8;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
+        input, button {
+            width: 100%;
+            padding: 10px;
+            margin: 5px 0;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 16px;
+        }
+        button {
+            background: #4CAF50;
+            color: white;
+            cursor: pointer;
+        }
+        button:hover {
+            background: #45a049;
+        }
+        #usersList {
+            margin-top: 20px;
+            padding: 10px;
+            background: #f9f9f9;
+            border-radius: 5px;
+            min-height: 100px;
+        }
+        .user-item {
+            padding: 8px;
+            margin: 5px 0;
+            background: white;
+            border-radius: 3px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .user-name {
+            font-weight: bold;
+        }
+        .user-time {
+            color: #666;
+            font-size: 12px;
+        }
+        #messages {
+            margin-top: 20px;
+            padding: 10px;
+            background: #fff3cd;
+            border-radius: 5px;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        .message {
+            padding: 5px;
+            margin: 3px 0;
+            border-left: 3px solid #ffc107;
+            padding-left: 10px;
+            font-size: 14px;
+        }
+        .status {
+            text-align: center;
+            padding: 5px;
+            border-radius: 3px;
+            margin-bottom: 10px;
+        }
+        .status.connected {
+            background: #d4edda;
+            color: #155724;
+        }
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔄 Тест BroadcastChannel</h1>
+        
+        <div id="status" class="status">Ініціалізація...</div>
+        
+        <div class="user-info">
+            <div><strong>Ваш ID:</strong> <span id="myId">-</span></div>
+            <div><strong>Час створення:</strong> <span id="myTime">-</span></div>
+        </div>
+        
+        <input type="text" id="userName" placeholder="Введіть ваше ім'я">
+        <button onclick="setName()">Встановити ім'я</button>
+        <button onclick="sendPing()">📡 Надіслати Ping</button>
+        
+        <div id="usersList">
+            <h3>👥 Активні користувачі:</h3>
+            <div id="usersContainer">
+                <div style="color: #999; text-align: center;">Очікування інших вкладок...</div>
+            </div>
+        </div>
+        
+        <div id="messages">
+            <h3>📨 Повідомлення:</h3>
+            <div id="messagesContainer"></div>
+        </div>
+    </div>
+
+    <!-- Use pubkey BroadcastChannel library -->
+    <script src="https://unpkg.com/broadcast-channel@7.0.0/dist/index.js"></script>
+    
+    <script>
+        // Generate unique ID
+        const myId = 'user_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5);
+        const myTime = new Date().toLocaleTimeString();
+        let myName = 'Анонім';
+        let channel = null;
+        let users = {};
+        
+        // Display my info
+        document.getElementById('myId').textContent = myId;
+        document.getElementById('myTime').textContent = myTime;
+        
+        // Add message to log
+        function addMessage(text, type = 'info') {
+            const container = document.getElementById('messagesContainer');
+            const msg = document.createElement('div');
+            msg.className = 'message';
+            msg.textContent = `[${new Date().toLocaleTimeString()}] ${text}`;
+            container.appendChild(msg);
+            container.scrollTop = container.scrollHeight;
+        }
+        
+        // Update users list
+        function updateUsersList() {
+            const container = document.getElementById('usersContainer');
+            const userCount = Object.keys(users).length;
+            
+            if (userCount === 0) {
+                container.innerHTML = '<div style="color: #999; text-align: center;">Очікування інших вкладок...</div>';
+            } else {
+                container.innerHTML = '';
+                for (const [id, user] of Object.entries(users)) {
+                    const userDiv = document.createElement('div');
+                    userDiv.className = 'user-item';
+                    userDiv.innerHTML = `
+                        <span class="user-name">${user.name}</span>
+                        <span class="user-time">${user.time}</span>
+                    `;
+                    container.appendChild(userDiv);
+                }
+            }
+        }
+        
+        // Initialize BroadcastChannel
+        function initChannel() {
+            try {
+                console.log('Creating BroadcastChannel...');
+                
+                // Create channel with pubkey library
+                channel = new BroadcastChannel('test_channel', {
+                    type: 'native'
+                });
+                
+                // Message handler
+                channel.onmessage = function(event) {
+                    const msg = event.data || event;
+                    console.log('Received:', msg);
+                    
+                    if (!msg || msg.senderId === myId) return;
+                    
+                    switch(msg.type) {
+                        case 'join':
+                            users[msg.senderId] = {
+                                name: msg.name,
+                                time: msg.time
+                            };
+                            addMessage(`${msg.name} приєднався`);
+                            updateUsersList();
+                            
+                            // Send response
+                            sendMessage({
+                                type: 'response',
+                                name: myName,
+                                time: myTime
+                            });
+                            break;
+                            
+                        case 'response':
+                            if (!users[msg.senderId]) {
+                                users[msg.senderId] = {
+                                    name: msg.name,
+                                    time: msg.time
+                                };
+                                addMessage(`Відповідь від ${msg.name}`);
+                                updateUsersList();
+                            }
+                            break;
+                            
+                        case 'leave':
+                            if (users[msg.senderId]) {
+                                addMessage(`${users[msg.senderId].name} вийшов`);
+                                delete users[msg.senderId];
+                                updateUsersList();
+                            }
+                            break;
+                            
+                        case 'ping':
+                            addMessage(`🏓 Ping від ${msg.name}`);
+                            break;
+                            
+                        case 'nameChange':
+                            if (users[msg.senderId]) {
+                                const oldName = users[msg.senderId].name;
+                                users[msg.senderId].name = msg.name;
+                                addMessage(`${oldName} змінив ім'я на ${msg.name}`);
+                                updateUsersList();
+                            }
+                            break;
+                    }
+                };
+                
+                document.getElementById('status').className = 'status connected';
+                document.getElementById('status').textContent = '✅ Підключено до каналу';
+                addMessage('Канал створено успішно');
+                
+                // Announce join
+                setTimeout(() => {
+                    sendMessage({
+                        type: 'join',
+                        name: myName,
+                        time: myTime
+                    });
+                }, 100);
+                
+            } catch(error) {
+                console.error('Error:', error);
+                document.getElementById('status').className = 'status error';
+                document.getElementById('status').textContent = '❌ Помилка: ' + error.message;
+                addMessage('Помилка створення каналу: ' + error.message);
+            }
+        }
+        
+        // Send message
+        function sendMessage(data) {
+            if (!channel) {
+                addMessage('Канал не готовий', 'error');
+                return;
+            }
+            
+            data.senderId = myId;
+            data.timestamp = Date.now();
+            
+            console.log('Sending:', data);
+            
+            try {
+                const result = channel.postMessage(data);
+                if (result && typeof result.then === 'function') {
+                    result.then(() => {
+                        console.log('Message sent successfully');
+                    }).catch(err => {
+                        console.error('Send error:', err);
+                        addMessage('Помилка відправки: ' + err.message);
+                    });
+                }
+            } catch(err) {
+                console.error('Send error:', err);
+                addMessage('Помилка відправки: ' + err.message);
+            }
+        }
+        
+        // User actions
+        function setName() {
+            const input = document.getElementById('userName');
+            const newName = input.value.trim();
+            
+            if (newName && newName !== myName) {
+                const oldName = myName;
+                myName = newName;
+                addMessage(`Ви змінили ім'я на ${newName}`);
+                
+                sendMessage({
+                    type: 'nameChange',
+                    name: newName,
+                    oldName: oldName
+                });
+            }
+        }
+        
+        function sendPing() {
+            sendMessage({
+                type: 'ping',
+                name: myName
+            });
+            addMessage('🏓 Ping надіслано');
+        }
+        
+        // Handle page unload
+        window.addEventListener('beforeunload', function() {
+            if (channel) {
+                sendMessage({
+                    type: 'leave',
+                    name: myName
+                });
+            }
+        });
+        
+        // Initialize on load
+        window.addEventListener('load', function() {
+            initChannel();
+        });
+    </script>
+</body>
+</html>

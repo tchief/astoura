@@ -22,10 +22,32 @@
             width: 100vw;
             height: 100vh;
         }
+        
+        /* Fix Aladin controls positioning on mobile */
+        .aladin-location {
+            top: 10px !important;
+            z-index: 999 !important;
+        }
+        
+        .aladin-fullscreen {
+            top: 10px !important;
+            right: 10px !important;
+            z-index: 999 !important;
+        }
+        
+        @media (max-width: 640px) {
+            .aladin-location {
+                font-size: 12px !important;
+            }
+            
+            .aladin-fullscreen {
+                right: 15px !important;
+            }
+        }
 
         #controls {
             position: fixed;
-            top: 20px;
+            top: 60px; /* Moved down to avoid overlap with Aladin controls */
             left: 20px;
             z-index: 1000;
             background: rgba(0, 0, 0, 0.8);
@@ -276,12 +298,27 @@
     <!-- jQuery -->
     <script src="https://code.jquery.com/jquery-3.6.0.min.js" crossorigin="anonymous"></script>
     
+    <!-- BroadcastChannel polyfill for cross-tab communication -->
+    <script src="https://unpkg.com/broadcast-channel@7.0.0/dist/index.js"></script>
+    
     <!-- Aladin Lite with WASM support -->
     <script type="text/javascript" src="https://aladin.cds.unistra.fr/AladinLite/api/v3/latest/aladin.js" charset="utf-8" crossorigin="anonymous"></script>
     
     <script type="text/javascript">
-        // Generate unique user ID
-        const userId = 'user_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+        // ========== CONFIGURATION ==========
+        // Set your Deno Deploy URL here when deployed
+        // Example: 'https://your-app.deno.dev'
+        const DENO_DEPLOY_URL = '';  // Leave empty to use same origin when deployed
+        // ===================================
+        
+        // Generate unique user ID (persistent per session)
+        let userId = sessionStorage.getItem('userId');
+        if (!userId) {
+            userId = 'user_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+            sessionStorage.setItem('userId', userId);
+        }
+        console.log('My userId:', userId);
+        
         let username = localStorage.getItem('username') || '';
         let userColor = localStorage.getItem('userColor') || '#4a9eff';
         let markerType = 'star';
@@ -317,9 +354,9 @@
             try {
                 // Try to initialize Aladin
                 aladin = A.aladin('#aladin-lite-div', {
-                survey: 'P/DSS2/color',
-                fov: 60,
-                target: 'M31',
+                survey: 'P/Mars/Viking',
+                fov: 180,
+                target: '0 0',
                 reticleColor: '#ff0000',
                 reticleSize: 32,
                 showReticle: false,
@@ -353,25 +390,7 @@
                 }
             });
             
-            // Track click position for marker placement
-            $('#aladin-lite-div').on('click', function(e) {
-                const rect = this.getBoundingClientRect();
-                const x = e.clientX - rect.left;
-                const y = e.clientY - rect.top;
-                
-                // Get coordinates from click position
-                try {
-                    const radec = aladin.pix2world(x, y);
-                    if (radec && radec.length >= 2) {
-                        currentRA = radec[0];
-                        currentDec = radec[1];
-                        $('#ra').text(currentRA.toFixed(4) + '°');
-                        $('#dec').text(currentDec.toFixed(4) + '°');
-                    }
-                } catch (err) {
-                    console.log('Click position:', x, y);
-                }
-            });
+            // Click handling is done through Aladin's own events
 
             aladin.on('objectClicked', function(object) {
                 if (object && object.data) {
@@ -430,8 +449,8 @@
             
             catalog.addSources([source]);
 
-            if (broadcast && broadcastChannel) {
-                broadcastChannel.postMessage({
+            if (broadcast && window.sendBroadcast) {
+                const message = {
                     type: 'newMarker',
                     marker: markerData,
                     user: {
@@ -439,7 +458,9 @@
                         name: username,
                         color: userColor
                     }
-                });
+                };
+                console.log('Broadcasting new marker:', message);
+                sendBroadcast(message);
             }
 
             updateMarkerCount();
@@ -464,14 +485,17 @@
             $('#marker-count').text(`${totalMarkers} ${totalMarkers === 1 ? 'мітка' : 'міток'}`);
         }
 
-        // Initialize broadcast channel for multiplayer
-        function initBroadcast() {
-            broadcastChannel = new BroadcastChannel('aladin_multiplayer');
+        // Handle incoming broadcast messages
+        function handleBroadcastMessage(data) {
+            console.log('=== handleBroadcastMessage called with:', data);
             
-            broadcastChannel.onmessage = function(event) {
-                const data = event.data;
-                
-                switch(data.type) {
+            // Prevent duplicate processing
+            if (data.senderId === userId) {
+                console.log('Ignoring own message');
+                return;
+            }
+            
+            switch(data.type) {
                     case 'newMarker':
                         if (data.marker.userId !== userId) {
                             markersData.push(data.marker);
@@ -485,12 +509,13 @@
                         break;
                         
                     case 'userJoined':
+                        console.log('User joined:', data.user);
                         activeUsers[data.user.id] = data.user;
                         updateUsersList();
                         // Send our markers to the new user
                         const myMarkers = markersData.filter(m => m.userId === userId);
                         if (myMarkers.length > 0) {
-                            broadcastChannel.postMessage({
+                            const syncMessage = {
                                 type: 'markersSync',
                                 markers: myMarkers,
                                 user: {
@@ -498,7 +523,9 @@
                                     name: username,
                                     color: userColor
                                 }
-                            });
+                            };
+                            console.log('Sending markers sync:', syncMessage);
+                            sendBroadcast(syncMessage);
                         }
                         break;
                         
@@ -524,12 +551,229 @@
                         }
                         updateMarkerCount();
                         break;
-                }
-            };
+            }
+        }
 
-            // Announce our presence
+        // Deno Deploy API endpoint
+        let apiBaseUrl = DENO_DEPLOY_URL || (
+            window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+                ? 'http://localhost:8000'  // Local Deno server
+                : window.location.origin   // Use same origin when deployed
+        );
+        
+        let lastMessageTimestamp = 0;
+        let eventSource = null;
+        let userPresenceInterval = null;
+        let reconnectTimeout = null;
+        
+        // Setup Server-Sent Events for real-time updates
+        function setupEventSource() {
+            if (eventSource) {
+                eventSource.close();
+            }
+            
+            try {
+                eventSource = new EventSource(`${apiBaseUrl}/api/events`);
+                
+                eventSource.onopen = function() {
+                    console.log('✅ SSE connected');
+                    $('#connection-status').text('🟢 Підключено');
+                    clearTimeout(reconnectTimeout);
+                };
+                
+                eventSource.onmessage = function(event) {
+                    try {
+                        const data = JSON.parse(event.data);
+                        
+                        if (data.type === 'connected') {
+                            console.log('SSE connected with ID:', data.clientId);
+                        } else if (data.type === 'message' && data.data) {
+                            const msg = data.data;
+                            if (msg.senderId !== userId && msg.timestamp > lastMessageTimestamp) {
+                                console.log('📨 Real-time message:', msg);
+                                handleBroadcastMessage(msg);
+                                lastMessageTimestamp = msg.timestamp;
+                            }
+                        }
+                    } catch(err) {
+                        console.error('Error parsing SSE message:', err);
+                    }
+                };
+                
+                eventSource.onerror = function(err) {
+                    console.error('SSE error:', err);
+                    $('#connection-status').text('⚠️ Перепідключення...');
+                    eventSource.close();
+                    
+                    // Reconnect after 3 seconds
+                    clearTimeout(reconnectTimeout);
+                    reconnectTimeout = setTimeout(() => {
+                        setupEventSource();
+                    }, 3000);
+                };
+            } catch(err) {
+                console.error('Failed to create EventSource:', err);
+                $('#connection-status').text('⚠️ Помилка з\'єднання');
+            }
+        }
+        
+        // Load initial messages
+        async function loadInitialMessages() {
+            try {
+                const response = await fetch(`${apiBaseUrl}/api/messages`);
+                if (!response.ok) throw new Error('Failed to fetch messages');
+                
+                const messages = await response.json();
+                
+                if (messages.length > 0) {
+                    lastMessageTimestamp = Math.max(...messages.map(m => m.timestamp));
+                    
+                    // Process any messages we don't have
+                    messages.forEach(msg => {
+                        if (msg.senderId !== userId && msg.type === 'newMarker') {
+                            if (!markersData.find(m => m.id === msg.marker.id)) {
+                                markersData.push(msg.marker);
+                                addMarkerToMap(msg.marker, false);
+                            }
+                        }
+                    });
+                    saveMarkers();
+                }
+            } catch(err) {
+                console.error('Error loading initial messages:', err);
+            }
+        }
+        
+        // Send user presence to server
+        async function sendUserPresence() {
+            try {
+                await fetch(`${apiBaseUrl}/api/users`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        id: userId,
+                        name: username || 'Анонім',
+                        color: userColor
+                    })
+                });
+            } catch(err) {
+                console.error('Error sending presence:', err);
+            }
+        }
+        
+        // Get active users from server
+        async function getActiveUsers() {
+            try {
+                const response = await fetch(`${apiBaseUrl}/api/users`);
+                if (!response.ok) throw new Error('Failed to fetch users');
+                
+                const users = await response.json();
+                activeUsers = {};
+                users.forEach(user => {
+                    if (user.id !== userId) {
+                        activeUsers[user.id] = user;
+                    }
+                });
+                updateUsersList();
+            } catch(err) {
+                console.error('Error fetching users:', err);
+            }
+        }
+        
+        // Send message to Deno KV
+        async function sendToAPI(message) {
+            try {
+                const response = await fetch(`${apiBaseUrl}/api/messages`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(message)
+                });
+                
+                if (!response.ok) throw new Error('Failed to send message');
+                const result = await response.json();
+                console.log('✅ Message sent to API:', result);
+            } catch(err) {
+                console.error('Error sending to API:', err);
+                $('#connection-status').text('⚠️ Помилка відправки');
+            }
+        }
+        
+        // Initialize broadcast channel for multiplayer
+        function initBroadcast() {
+            console.log('🚀 initBroadcast called!');
+            
+            // Setup dual communication: BroadcastChannel for same-browser + API polling for cross-device
+            
+            // 1. Setup BroadcastChannel for same-browser tabs
+            if (typeof BroadcastChannel !== 'undefined') {
+                try {
+                    const channel = new BroadcastChannel('aladin_multiplayer', {
+                        type: 'native',
+                        webWorkerSupport: true
+                    });
+                    
+                    console.log('📡 BroadcastChannel created for same-browser sync');
+                    
+                    // Listen for messages from same browser tabs
+                    channel.onmessage = function(event) {
+                        const msg = event.data || event;
+                        console.log('📨 Received from BroadcastChannel:', msg);
+                        if (msg && msg.senderId !== userId) {
+                            handleBroadcastMessage(msg);
+                        }
+                    };
+                    
+                    window.broadcastChannel = channel;
+                } catch(e) {
+                    console.error('BroadcastChannel error:', e);
+                }
+            }
+            
+            // 2. Setup sendBroadcast to use both BroadcastChannel and API
+            window.sendBroadcast = function(message) {
+                console.log('>>> Sending message:', message);
+                message.senderId = userId;
+                message.timestamp = Date.now();
+                
+                // Send to BroadcastChannel for same-browser tabs
+                if (window.broadcastChannel) {
+                    try {
+                        const result = window.broadcastChannel.postMessage(message);
+                        if (result && typeof result.then === 'function') {
+                            result.then(() => {
+                                console.log('✅ Sent to BroadcastChannel');
+                            }).catch((err) => {
+                                console.error('❌ BroadcastChannel error:', err);
+                            });
+                        }
+                    } catch(err) {
+                        console.error('BroadcastChannel error:', err);
+                    }
+                }
+                
+                // Send to API for cross-device communication
+                sendToAPI(message);
+            };
+            
+            // 3. Load initial messages
+            loadInitialMessages();
+            
+            // 4. Use polling for now (SSE needs fixing)
+            setInterval(loadInitialMessages, 3000); // Poll every 3 seconds
+            
+            // 5. Start user presence updates
+            userPresenceInterval = setInterval(() => {
+                sendUserPresence();
+                getActiveUsers();
+            }, 20000); // Update every 20 seconds
+            
+            // Initial presence and user fetch
+            sendUserPresence();
+            getActiveUsers();
+            
+            // Announce presence
             setTimeout(() => {
-                broadcastChannel.postMessage({
+                sendBroadcast({
                     type: 'userJoined',
                     user: {
                         id: userId,
@@ -538,6 +782,8 @@
                     }
                 });
             }, 500);
+            
+            console.log('✅ Multiplayer ready with real-time sync!');
         }
 
         // Update active users list
@@ -545,6 +791,17 @@
             const usersDiv = $('#users');
             usersDiv.empty();
             
+            // Show current user first
+            if (username) {
+                usersDiv.append(`
+                    <div class="user-item">
+                        <div class="user-color" style="background: ${userColor}"></div>
+                        <div class="user-name">${username} (Ви)</div>
+                    </div>
+                `);
+            }
+            
+            // Show other users
             Object.values(activeUsers).forEach(user => {
                 if (user.id !== userId) {
                     usersDiv.append(`
@@ -555,6 +812,11 @@
                     `);
                 }
             });
+            
+            // If no other users and no current user name
+            if (Object.keys(activeUsers).length === 0 && !username) {
+                usersDiv.append('<div style="color: #888; font-size: 12px;">Немає активних користувачів</div>');
+            }
         }
 
         // Wait for Aladin library and WASM to load
@@ -582,27 +844,61 @@
 
             // Wait for Aladin to load, then initialize
             waitForAladin(function() {
+                console.log('Aladin loaded, initializing...');
                 initAladin();
                 // Initialize broadcast channel after Aladin is ready
                 initBroadcast();
+                // Show initial users list
+                updateUsersList();
+                
+                // Send presence update after everything is ready
+                setTimeout(() => {
+                    if (window.sendBroadcast) {
+                        const updateMessage = {
+                            type: 'userJoined',
+                            user: {
+                                id: userId,
+                                name: username || 'Анонім',
+                                color: userColor
+                            }
+                        };
+                        console.log('Sending delayed join message:', updateMessage);
+                        sendBroadcast(updateMessage);
+                    }
+                }, 1000);
             });
             
             // Toggle controls
             $('#toggle-controls').click(function() {
                 $('#controls').toggleClass('collapsed');
                 $(this).text($('#controls').hasClass('collapsed') ? '☰' : '✕');
+                // Mark as manually toggled to prevent auto-collapse
+                $('#toggle-controls').data('manually-toggled', true);
             });
 
+            // Prevent menu from closing on input focus (mobile)
+            $('#controls input, #controls textarea, #controls select').on('focus', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                // Keep menu open
+                if (window.innerWidth < 640) {
+                    $('#controls').removeClass('collapsed');
+                    $('#toggle-controls').text('✕');
+                }
+            });
+            
             // Save username
             $('#username').on('input', function() {
                 username = $(this).val();
                 localStorage.setItem('username', username);
+                updateUsersList(); // Update list when name changes
             });
 
             // Save color
             $('#userColor').on('change', function() {
                 userColor = $(this).val();
                 localStorage.setItem('userColor', userColor);
+                updateUsersList(); // Update list when color changes
             });
 
             // Marker type selection
@@ -652,7 +948,7 @@
                         usersCatalog[userId].clear();
                     }
                     
-                    broadcastChannel.postMessage({
+                    sendBroadcast({
                         type: 'clearUserMarkers',
                         userId: userId
                     });
@@ -666,16 +962,13 @@
                 }
             });
 
-            // Handle window resize for mobile
+            // Handle window resize for mobile - removed auto-collapse
             function handleResize() {
-                if (window.innerWidth < 640) {
-                    $('#controls').addClass('collapsed');
-                    $('#toggle-controls').text('☰');
-                }
+                // No longer auto-collapse on mobile
+                // User must manually toggle the menu
             }
-
+            
             $(window).resize(handleResize);
-            handleResize();
 
             // Prevent zoom on mobile
             document.addEventListener('touchmove', function (event) {
@@ -695,6 +988,13 @@
                 }
                 lastTap = currentTime;
             });
+            
+            // Cleanup on page unload
+            window.addEventListener('beforeunload', function() {
+                if (eventSource) eventSource.close();
+                if (userPresenceInterval) clearInterval(userPresenceInterval);
+                if (reconnectTimeout) clearTimeout(reconnectTimeout);
+            });
         }
         
         // Document ready - use different approach for Firefox
@@ -706,6 +1006,100 @@
         } else {
             // For other browsers
             $(document).ready(initApp);
+        }
+        
+        // Debug: Test localStorage sync
+        window.testSync = function() {
+            console.log('=== TESTING SYNC ===');
+            console.log('My userId:', userId);
+            
+            // Show current queue
+            const queue = localStorage.getItem('message_queue');
+            console.log('Current queue:', queue);
+            
+            // Send test message
+            const testMsg = {
+                type: 'test',
+                text: 'Test from ' + userId,
+                senderId: userId,
+                timestamp: Date.now()
+            };
+            
+            console.log('Sending test message:', testMsg);
+            sendBroadcast(testMsg);
+            
+            // Check queue after send
+            setTimeout(() => {
+                const newQueue = localStorage.getItem('message_queue');
+                console.log('Queue after send:', newQueue);
+            }, 100);
+        }
+        
+        // Debug: Manual check
+        window.checkMessages = function() {
+            const queue = localStorage.getItem('message_queue');
+            if (queue) {
+                const messages = JSON.parse(queue);
+                console.log('Messages in queue:', messages.length);
+                messages.forEach(msg => {
+                    console.log('- Message:', msg);
+                });
+            } else {
+                console.log('No messages in queue');
+            }
+        }
+        
+        // Simple sync via URL hash
+        window.simpleSync = function() {
+            // Send message via hash
+            window.sendSimple = function(msg) {
+                const data = {
+                    msg: msg,
+                    from: userId,
+                    time: Date.now()
+                };
+                window.location.hash = btoa(JSON.stringify(data));
+                console.log('Sent via hash:', data);
+            };
+            
+            // Listen for hash changes
+            window.addEventListener('hashchange', function() {
+                try {
+                    const hash = window.location.hash.substring(1);
+                    if (hash) {
+                        const data = JSON.parse(atob(hash));
+                        if (data.from !== userId) {
+                            console.log('📨 Received via hash:', data);
+                            alert('Message: ' + data.msg);
+                        }
+                    }
+                } catch(e) {}
+            });
+            
+            console.log('Simple sync ready. Use sendSimple("your message")');
+        };
+        
+        // Debug: Check localStorage isolation
+        window.debugStorage = function() {
+            console.log('=== STORAGE DEBUG ===');
+            console.log('userId:', userId);
+            console.log('sessionStorage userId:', sessionStorage.getItem('userId'));
+            console.log('localStorage test:', localStorage.getItem('test_' + Date.now()));
+            
+            // Set test value
+            const testKey = 'sync_test_' + Date.now();
+            const testValue = 'From ' + userId + ' at ' + Date.now();
+            localStorage.setItem(testKey, testValue);
+            console.log('Set in localStorage:', testKey, '=', testValue);
+            
+            // Show all localStorage keys
+            console.log('All localStorage keys:');
+            for(let i = 0; i < localStorage.length; i++) {
+                const key = localStorage.key(i);
+                if (key.startsWith('sync_test_') || key.startsWith('message_queue')) {
+                    console.log('-', key, '=', localStorage.getItem(key));
+                }
+            }
         }
     </script>
 </body>
